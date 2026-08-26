@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { TEAMS } from '../engine/teams';
 import { STADIUMS } from '../engine/stadiums';
 import { FORMATS } from '../engine/constants';
@@ -8,6 +8,7 @@ export default function LiveMatch({ matchData, config, onShowResult }) {
   const [visibleBalls, setVisibleBalls] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
   const [speed, setSpeed] = useState(1200); // ms per ball
+  const [playMode, setPlayMode] = useState('ball'); // 'ball' | 'over' | 'wicket'
   const commentaryRef = useRef(null);
   const timerRef = useRef(null);
 
@@ -19,14 +20,44 @@ export default function LiveMatch({ matchData, config, onShowResult }) {
 
   const totalBallsInInnings = innings.ballLog.length;
 
+  const advanceSimulation = useCallback(() => {
+    if (visibleBalls >= totalBallsInInnings) {
+      if (activeInnings === 1) {
+        setActiveInnings(2);
+        setVisibleBalls(0);
+      } else {
+        setIsPlaying(false);
+      }
+      return;
+    }
+
+    if (playMode === 'ball') {
+      setVisibleBalls(prev => Math.min(totalBallsInInnings, prev + 1));
+    } else if (playMode === 'over') {
+      const currentOverNum = innings.ballLog[visibleBalls]?.over;
+      let nextIdx = visibleBalls + 1;
+      while (nextIdx < totalBallsInInnings && innings.ballLog[nextIdx]?.over === currentOverNum) {
+        nextIdx++;
+      }
+      setVisibleBalls(nextIdx);
+    } else if (playMode === 'wicket') {
+      let nextIdx = visibleBalls + 1;
+      while (nextIdx < totalBallsInInnings && innings.ballLog[nextIdx - 1]?.result.type !== 'wicket') {
+        nextIdx++;
+      }
+      setVisibleBalls(nextIdx);
+    }
+  }, [visibleBalls, totalBallsInInnings, activeInnings, playMode, innings.ballLog]);
+
   // Auto-play through the innings
   useEffect(() => {
     if (!isPlaying) return;
 
     if (visibleBalls < totalBallsInInnings) {
+      const currentSpeed = playMode === 'ball' ? speed : playMode === 'over' ? speed * 1.5 : speed * 2.2;
       timerRef.current = setTimeout(() => {
-        setVisibleBalls(prev => prev + 1);
-      }, speed);
+        advanceSimulation();
+      }, currentSpeed);
     } else if (activeInnings === 1 && visibleBalls >= totalBallsInInnings) {
       // Auto switch to 2nd innings
       setTimeout(() => {
@@ -36,7 +67,7 @@ export default function LiveMatch({ matchData, config, onShowResult }) {
     }
 
     return () => clearTimeout(timerRef.current);
-  }, [visibleBalls, isPlaying, totalBallsInInnings, activeInnings, speed]);
+  }, [visibleBalls, isPlaying, totalBallsInInnings, activeInnings, speed, playMode, advanceSimulation]);
 
   // Scroll commentary
   useEffect(() => {
@@ -206,7 +237,34 @@ export default function LiveMatch({ matchData, config, onShowResult }) {
           <strong>{matchData.toss.winner}</strong>
           <span>elected to {matchData.toss.decision}</span>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {/* Mode Selector */}
+          <select 
+            value={playMode} 
+            onChange={(e) => setPlayMode(e.target.value)}
+            style={{ 
+              background: 'var(--bg-secondary)', 
+              color: 'var(--text-primary)', 
+              border: '1px solid var(--border-medium)', 
+              borderRadius: 'var(--radius-sm)', 
+              padding: '4px 24px 4px 8px', 
+              fontSize: '0.78rem',
+              height: '32px',
+              cursor: 'pointer',
+              outline: 'none',
+              appearance: 'none',
+              backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'12\' height=\'12\' fill=\'%2394a3b8\' viewBox=\'0 0 16 16\'%3E%3Cpath d=\'M4 6l4 4 4-4\'/%3E%3C/svg%3E")',
+              backgroundRepeat: 'no-repeat',
+              backgroundPosition: 'right 8px center',
+            }}
+            id="play-mode-select"
+            title="Simulation Mode"
+          >
+            <option value="ball">🏏 Ball Mode</option>
+            <option value="over">📅 Over Mode</option>
+            <option value="wicket">🔴 Wicket Mode</option>
+          </select>
+
           <button className="btn btn-ghost btn-sm" onClick={() => setSpeed(s => Math.min(3000, s + 200))} id="btn-slow-down" title="Slower">
             🐌
           </button>
@@ -216,11 +274,23 @@ export default function LiveMatch({ matchData, config, onShowResult }) {
           <button className="btn btn-ghost btn-sm" onClick={() => setSpeed(s => Math.max(100, s - 200))} id="btn-speed-up" title="Faster">
             ⚡
           </button>
-          <button className="btn btn-ghost btn-sm" onClick={() => setIsPlaying(p => !p)} id="btn-play-pause">
+          <button className="btn btn-ghost btn-sm" onClick={() => setIsPlaying(p => !p)} id="btn-play-pause" title={isPlaying ? 'Pause' : 'Play'}>
             {isPlaying ? '⏸' : '▶️'}
           </button>
+
+          {!isPlaying && visibleBalls < totalBallsInInnings && (
+            <button 
+              className="btn btn-primary btn-sm" 
+              onClick={advanceSimulation} 
+              id="btn-step"
+              style={{ fontWeight: 600 }}
+            >
+              ➡️ Next {playMode === 'ball' ? 'Ball' : playMode === 'over' ? 'Over' : 'Wicket'}
+            </button>
+          )}
+
           <button className="btn btn-ghost btn-sm" onClick={handleSkip} id="btn-skip-innings">
-            ⏭ Skip
+            Skip Innings
           </button>
           <button className="btn btn-secondary btn-sm" onClick={handleSkipToResult} id="btn-view-result">
             📊 Result
