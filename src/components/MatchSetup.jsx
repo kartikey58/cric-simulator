@@ -43,18 +43,22 @@ export default function MatchSetup({ onStartMatch }) {
   const [format, setFormat] = useState('T20');
   const [stadium, setStadium] = useState('Wankhede Stadium');
 
-  // Draft mode states
+  // Draft mode setup states
   const [draftTeam1Name, setDraftTeam1Name] = useState('Team Alpha');
   const [draftTeam2Name, setDraftTeam2Name] = useState('Team Beta');
   const [draftTeam1Players, setDraftTeam1Players] = useState(Array(11).fill(null));
   const [draftTeam2Players, setDraftTeam2Players] = useState(Array(11).fill(null));
 
-  // Spin the wheel states
-  const [spinningSlot, setSpinningSlot] = useState(null); // { team: 'team1'|'team2', slotId: number }
-  const [spunCountries, setSpunCountries] = useState({ team1: {}, team2: {} });
+  // Turn-based Draft Game states
+  const [draftStage, setDraftStage] = useState('setup'); // 'setup' | 'toss' | 'drafting' | 'complete'
+  const [tossWinner, setTossWinner] = useState(null); // 'team1' | 'team2'
+  const [isFlipping, setIsFlipping] = useState(false);
+  const [coinRotation, setCoinRotation] = useState(0);
+  
+  const [currentTurn, setCurrentTurn] = useState(0); // 0 to 21 (22 players total)
+  const [turnSpunCountry, setTurnSpunCountry] = useState(null); // Country spun for the current pick
   const [isSpinning, setIsSpinning] = useState(false);
   const [wheelRotation, setWheelRotation] = useState(0);
-  const [selectedCountryResult, setSelectedCountryResult] = useState(null);
 
   const teamList = useMemo(() => getTeamList(), []);
   const stadiumsByCountry = useMemo(() => getStadiumsByCountry(), []);
@@ -86,6 +90,22 @@ export default function MatchSetup({ onStartMatch }) {
   const team1Data = TEAMS[team1];
   const team2Data = TEAMS[team2];
 
+  // Dynamic turn calculations
+  const turnDetails = useMemo(() => {
+    if (draftStage !== 'drafting') return null;
+    const isTeam1First = tossWinner === 'team1';
+    const isTeam1Turn = (currentTurn % 2 === 0) ? isTeam1First : !isTeam1First;
+    const slotIndex = Math.floor(currentTurn / 2);
+    
+    return {
+      teamKey: isTeam1Turn ? 'team1' : 'team2',
+      teamName: isTeam1Turn ? draftTeam1Name : draftTeam2Name,
+      slotId: slotIndex,
+      slotLabel: DRAFT_SLOTS[slotIndex].label,
+      category: DRAFT_SLOTS[slotIndex].category
+    };
+  }, [draftStage, currentTurn, tossWinner, draftTeam1Name, draftTeam2Name]);
+
   // Names already drafted by either team
   const draftedNames = useMemo(() => {
     return [
@@ -94,11 +114,11 @@ export default function MatchSetup({ onStartMatch }) {
     ];
   }, [draftTeam1Players, draftTeam2Players]);
 
-  const getAvailablePlayers = (category, country, currentSelectedName) => {
+  const getAvailablePlayers = (category, country) => {
     return playerPool.filter(p =>
       p.category === category &&
       p.teamName === country &&
-      (!draftedNames.includes(p.name) || p.name === currentSelectedName)
+      !draftedNames.includes(p.name)
     );
   };
 
@@ -161,49 +181,68 @@ export default function MatchSetup({ onStartMatch }) {
     }
   };
 
+  // Toss flip trigger
+  const triggerToss = () => {
+    if (isFlipping) return;
+    setIsFlipping(true);
+    setTossWinner(null);
+
+    const winner = Math.random() < 0.5 ? 'team1' : 'team2';
+    // Spin animation angle
+    const targetRotation = 1440 + (winner === 'team1' ? 0 : 180);
+    setCoinRotation(targetRotation);
+
+    setTimeout(() => {
+      setTossWinner(winner);
+      setIsFlipping(false);
+    }, 1800);
+  };
+
+  // Turn-based Spin Wheel trigger
   const triggerSpin = () => {
     if (isSpinning) return;
     setIsSpinning(true);
-    setSelectedCountryResult(null);
+    setTurnSpunCountry(null);
 
-    // Pick random country index
     const targetIdx = Math.floor(Math.random() * 6);
-    // Align sector to pointer (0 degrees pointing down or top)
-    // Sector center is i * 60 + 30 degrees. To align top, we rotate 360 - (i * 60 + 30)
     const rotation = 1800 + (360 - (targetIdx * 60 + 30));
     setWheelRotation(rotation);
 
     setTimeout(() => {
       const countryObj = countries[targetIdx];
       const countryName = countryObj.fullName || countryObj.name;
-      setSelectedCountryResult(countryObj);
-
-      // Save country for that slot
-      const updated = { ...spunCountries };
-      if (!updated[spinningSlot.team]) updated[spinningSlot.team] = {};
-      updated[spinningSlot.team][spinningSlot.slotId] = countryName;
-      setSpunCountries(updated);
-
-      // Clean up player slot if it was already selected but from a different country
-      const currentSlotPlayer = spinningSlot.team === 'team1' 
-        ? draftTeam1Players[spinningSlot.slotId] 
-        : draftTeam2Players[spinningSlot.slotId];
-        
-      if (currentSlotPlayer && currentSlotPlayer.teamName !== countryName) {
-        const updatedPlayers = spinningSlot.team === 'team1' ? [...draftTeam1Players] : [...draftTeam2Players];
-        updatedPlayers[spinningSlot.slotId] = null;
-        if (spinningSlot.team === 'team1') setDraftTeam1Players(updatedPlayers);
-        else setDraftTeam2Players(updatedPlayers);
-      }
-
+      setTurnSpunCountry(countryName);
       setIsSpinning(false);
-      // Wait a moment so player sees the final result before modal closes
-      setTimeout(() => {
-        setSpinningSlot(null);
-        setWheelRotation(0);
-        setSelectedCountryResult(null);
-      }, 1500);
     }, 2500);
+  };
+
+  // Selects player and advances the draft turn
+  const handleDraftPlayer = (player) => {
+    const isTeam1 = turnDetails.teamKey === 'team1';
+    const updated = isTeam1 ? [...draftTeam1Players] : [...draftTeam2Players];
+    updated[turnDetails.slotId] = player;
+
+    if (isTeam1) {
+      setDraftTeam1Players(updated);
+    } else {
+      setDraftTeam2Players(updated);
+    }
+
+    setTurnSpunCountry(null);
+    if (currentTurn < 21) {
+      setCurrentTurn(prev => prev + 1);
+    } else {
+      setDraftStage('complete');
+    }
+  };
+
+  const handleResetDraft = () => {
+    setDraftTeam1Players(Array(11).fill(null));
+    setDraftTeam2Players(Array(11).fill(null));
+    setCurrentTurn(0);
+    setTurnSpunCountry(null);
+    setTossWinner(null);
+    setDraftStage('setup');
   };
 
   return (
@@ -234,7 +273,7 @@ export default function MatchSetup({ onStartMatch }) {
       </div>
 
       <div className="setup-grid">
-        {/* Preset Selector */}
+        {/* PRESET TEAM SELECTOR */}
         {mode === 'preset' && (
           <div className="setup-section" id="section-teams">
             <div className="setup-section-title">
@@ -300,424 +339,500 @@ export default function MatchSetup({ onStartMatch }) {
           </div>
         )}
 
-        {/* Custom Draft Board */}
+        {/* CUSTOM SQUAD DRAFT MODE */}
         {mode === 'draft' && (
-          <div className="setup-section animate-fade-in" id="section-draft">
-            <div className="setup-section-title">
-              <span>⚔️ Squad Draft Board</span>
-            </div>
-            
-            {/* Custom Team Names */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
-              <div>
-                <label style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>
-                  Draft Team A (Home)
-                </label>
-                <input 
-                  type="text" 
-                  className="select-field" 
-                  value={draftTeam1Name}
-                  onChange={(e) => setDraftTeam1Name(e.target.value)}
-                  style={{ backgroundImage: 'none', padding: '10px 16px' }}
-                />
-              </div>
-              <div>
-                <label style={{ fontSize: '0.78rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', display: 'block', marginBottom: 4 }}>
-                  Draft Team B (Away)
-                </label>
-                <input 
-                  type="text" 
-                  className="select-field" 
-                  value={draftTeam2Name}
-                  onChange={(e) => setDraftTeam2Name(e.target.value)}
-                  style={{ backgroundImage: 'none', padding: '10px 16px' }}
-                />
-              </div>
-            </div>
-
-            {/* Grid of Slots */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr', gap: 16, alignItems: 'center', borderBottom: '1px solid var(--border-subtle)', paddingBottom: 8 }}>
-                <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{draftTeam1Name}</div>
-                <div style={{ textAlign: 'center', fontWeight: 700, fontSize: '0.72rem', color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>Duty</div>
-                <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{draftTeam2Name}</div>
-              </div>
-
-              {DRAFT_SLOTS.map((slot) => {
-                const p1 = draftTeam1Players[slot.id];
-                const p2 = draftTeam2Players[slot.id];
-
-                const country1 = spunCountries.team1[slot.id];
-                const country2 = spunCountries.team2[slot.id];
-
-                const pool1 = country1 ? getAvailablePlayers(slot.category, country1, p1?.name) : [];
-                const pool2 = country2 ? getAvailablePlayers(slot.category, country2, p2?.name) : [];
-
-                return (
-                  <div key={slot.id} style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr', gap: 16, alignItems: 'center' }}>
-                    {/* Team A Picker */}
-                    {country1 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem' }}>
-                          <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Country: {countries.find(c => (c.fullName || c.name) === country1)?.emoji} {country1}</span>
-                          <button 
-                            className="btn-ghost" 
-                            style={{ padding: '0 4px', fontSize: '0.65rem', color: 'var(--accent-red)', cursor: 'pointer', background: 'none', border: 'none' }}
-                            onClick={() => setSpinningSlot({ team: 'team1', slotId: slot.id })}
-                            title="Respin Country"
-                          >
-                            🔄 Respin
-                          </button>
-                        </div>
-                        {pool1.length > 0 ? (
-                          <select
-                            className="select-field"
-                            style={{ fontSize: '0.82rem', padding: '8px 12px', height: '38px', backgroundPosition: 'right 8px center' }}
-                            value={p1 ? p1.name : ''}
-                            onChange={(e) => {
-                              const selected = pool1.find(p => p.name === e.target.value);
-                              const updated = [...draftTeam1Players];
-                              updated[slot.id] = selected || null;
-                              setDraftTeam1Players(updated);
-                            }}
-                          >
-                            <option value="">— Select {slot.label} —</option>
-                            {pool1.map(p => (
-                              <option key={p.name} value={p.name}>
-                                {p.name}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <div style={{ fontSize: '0.72rem', color: 'var(--accent-red)', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px dashed var(--accent-red)', borderRadius: 'var(--radius-sm)' }}>
-                            No players left! Respin 🔄
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <button
-                        className="btn btn-secondary btn-sm"
-                        style={{ height: '38px', width: '100%', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600 }}
-                        onClick={() => setSpinningSlot({ team: 'team1', slotId: slot.id })}
-                      >
-                        🎯 Spin Country
-                      </button>
-                    )}
-
-                    {/* Duty Label */}
-                    <div style={{ 
-                      textAlign: 'center', 
-                      fontSize: '0.72rem', 
-                      fontWeight: 700, 
-                      textTransform: 'uppercase',
-                      color: slot.category === 'opener' ? 'var(--accent-red)' :
-                             slot.category === 'middle' ? 'var(--accent-amber)' :
-                             slot.category === 'keeper' ? 'var(--accent-cyan)' :
-                             slot.category === 'all-rounder' ? 'var(--accent-pink)' : 'var(--accent-primary-light)',
-                      background: 'var(--bg-secondary)',
-                      padding: '6px 4px',
-                      borderRadius: '6px',
-                      border: '1px solid var(--border-subtle)'
-                    }}>
-                      {slot.label}
-                    </div>
-
-                    {/* Team B Picker */}
-                    {country2 ? (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem' }}>
-                          <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Country: {countries.find(c => (c.fullName || c.name) === country2)?.emoji} {country2}</span>
-                          <button 
-                            className="btn-ghost" 
-                            style={{ padding: '0 4px', fontSize: '0.65rem', color: 'var(--accent-red)', cursor: 'pointer', background: 'none', border: 'none' }}
-                            onClick={() => setSpinningSlot({ team: 'team2', slotId: slot.id })}
-                            title="Respin Country"
-                          >
-                            🔄 Respin
-                          </button>
-                        </div>
-                        {pool2.length > 0 ? (
-                          <select
-                            className="select-field"
-                            style={{ fontSize: '0.82rem', padding: '8px 12px', height: '38px', backgroundPosition: 'right 8px center' }}
-                            value={p2 ? p2.name : ''}
-                            onChange={(e) => {
-                              const selected = pool2.find(p => p.name === e.target.value);
-                              const updated = [...draftTeam2Players];
-                              updated[slot.id] = selected || null;
-                              setDraftTeam2Players(updated);
-                            }}
-                          >
-                            <option value="">— Select {slot.label} —</option>
-                            {pool2.map(p => (
-                              <option key={p.name} value={p.name}>
-                                {p.name}
-                              </option>
-                            ))}
-                          </select>
-                        ) : (
-                          <div style={{ fontSize: '0.72rem', color: 'var(--accent-red)', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px dashed var(--accent-red)', borderRadius: 'var(--radius-sm)' }}>
-                            No players left! Respin 🔄
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      <button
-                        className="btn btn-secondary btn-sm"
-                        style={{ height: '38px', width: '100%', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600 }}
-                        onClick={() => setSpinningSlot({ team: 'team2', slotId: slot.id })}
-                      >
-                        🎯 Spin Country
-                      </button>
-                    )}
+          <div className="setup-section animate-fade-in" id="section-draft" style={{ gridColumn: 'span 2' }}>
+            {/* STAGE 1: DRAFT SETUP */}
+            {draftStage === 'setup' && (
+              <div style={{ padding: 'var(--space-md)' }}>
+                <div className="setup-section-title" style={{ marginBottom: 24 }}>
+                  <span>🛡️ Name Custom Squads</span>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 32 }}>
+                  <div>
+                    <label style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
+                      Home Custom Team Name
+                    </label>
+                    <input 
+                      type="text" 
+                      className="select-field" 
+                      value={draftTeam1Name}
+                      onChange={(e) => setDraftTeam1Name(e.target.value)}
+                      style={{ backgroundImage: 'none', padding: '12px 16px', fontSize: '0.9rem' }}
+                    />
                   </div>
-                );
-              })}
+                  <div>
+                    <label style={{ fontSize: '0.8rem', color: 'var(--text-tertiary)', textTransform: 'uppercase', display: 'block', marginBottom: 6 }}>
+                      Away Custom Team Name
+                    </label>
+                    <input 
+                      type="text" 
+                      className="select-field" 
+                      value={draftTeam2Name}
+                      onChange={(e) => setDraftTeam2Name(e.target.value)}
+                      style={{ backgroundImage: 'none', padding: '12px 16px', fontSize: '0.9rem' }}
+                    />
+                  </div>
+                </div>
+                <div style={{ textAlign: 'center' }}>
+                  <button 
+                    className="btn btn-primary" 
+                    style={{ padding: '14px 40px', fontSize: '0.95rem', fontWeight: 700, borderRadius: '25px' }}
+                    onClick={() => setDraftStage('toss')}
+                  >
+                    🪙 Proceed to Toss
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* STAGE 2: DRAFT TOSS */}
+            {draftStage === 'toss' && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', padding: 'var(--space-xl) 0' }}>
+                <h3 style={{ marginBottom: 12 }}>🪙 The Custom Draft Toss</h3>
+                <p style={{ color: 'var(--text-tertiary)', fontSize: '0.82rem', marginBottom: 32, textAlign: 'center' }}>
+                  Winner of the coin toss gets the advantage of drafting their first player first!
+                </p>
+
+                {/* Coin Flipping Box */}
+                <div style={{ position: 'relative', width: '120px', height: '120px', marginBottom: 32 }}>
+                  <div style={{
+                    width: '100%', height: '100%',
+                    borderRadius: '50%',
+                    background: 'radial-gradient(circle, #ffe066 0%, #ca8a04 100%)',
+                    border: '4px solid #ffffff',
+                    boxShadow: '0 4px 15px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.6)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '2.5rem',
+                    fontWeight: 'bold',
+                    color: '#ffffff',
+                    textShadow: '0 2px 4px rgba(0,0,0,0.5)',
+                    transition: isFlipping ? 'transform 1.8s cubic-bezier(0.1, 0.9, 0.2, 1)' : 'none',
+                    transform: `rotateX(${coinRotation}deg)`
+                  }}>
+                    🏏
+                  </div>
+                </div>
+
+                <div style={{ height: '60px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                  {tossWinner ? (
+                    <div style={{ textAlign: 'center' }} className="animate-scale-in">
+                      <div style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--accent-green)', marginBottom: 16 }}>
+                        🎉 {tossWinner === 'team1' ? draftTeam1Name : draftTeam2Name} won the toss!
+                      </div>
+                      <button 
+                        className="btn btn-primary"
+                        style={{ padding: '12px 32px', borderRadius: '20px', fontWeight: 600 }}
+                        onClick={() => setDraftStage('drafting')}
+                      >
+                        🚀 Start Live Draft
+                      </button>
+                    </div>
+                  ) : (
+                    <button 
+                      className="btn btn-primary"
+                      style={{ padding: '12px 32px', borderRadius: '20px', fontWeight: 600 }}
+                      onClick={triggerToss}
+                      disabled={isFlipping}
+                    >
+                      {isFlipping ? 'Flipping...' : 'Flip Coin'}
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* STAGE 3: LIVE DRAFTING GAME */}
+            {draftStage === 'drafting' && turnDetails && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 32, padding: 'var(--space-md)' }}>
+                
+                {/* Left Area: Live Turn & Spun Country Selector */}
+                <div className="card" style={{ padding: '24px', background: 'var(--glass-bg)', border: '1px solid var(--border-medium)', minHeight: '420px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                  <div style={{ width: '100%', borderBottom: '1px solid var(--border-subtle)', paddingBottom: 12, marginBottom: 20 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span className="badge badge-primary" style={{ fontSize: '0.7rem' }}>Pick {currentTurn + 1} / 22</span>
+                      <button 
+                        className="btn-ghost" 
+                        style={{ fontSize: '0.72rem', color: 'var(--accent-red)', cursor: 'pointer', background: 'none', border: 'none' }}
+                        onClick={handleResetDraft}
+                      >
+                        ❌ Cancel Draft
+                      </button>
+                    </div>
+                    <h3 style={{ marginTop: 8, fontSize: '1.15rem' }}>
+                      ⚔️ {turnDetails.teamName} Turn
+                    </h3>
+                    <p style={{ color: 'var(--text-tertiary)', fontSize: '0.78rem', marginTop: 4 }}>
+                      Drafting Duty: <strong style={{ color: 'var(--accent-cyan)' }}>{turnDetails.slotLabel}</strong>
+                    </p>
+                  </div>
+
+                  {/* Turn flow state 1: Spin country */}
+                  {!turnSpunCountry && (
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+                      {/* Interactive conic gradient selector wheel */}
+                      <div style={{ position: 'relative', width: '220px', height: '220px', marginBottom: 20 }}>
+                        <div style={{
+                          position: 'absolute',
+                          top: '-6px', left: 'calc(50% - 10px)',
+                          width: 0, height: 0,
+                          borderLeft: '10px solid transparent',
+                          borderRight: '10px solid transparent',
+                          borderTop: '18px solid var(--accent-red)',
+                          zIndex: 10
+                        }} />
+                        <div style={{
+                          width: '200px', height: '200px',
+                          borderRadius: '50%',
+                          border: '5px solid var(--border-medium)',
+                          boxShadow: '0 0 15px rgba(99, 102, 241, 0.2), inset 0 0 8px rgba(0,0,0,0.5)',
+                          background: 'conic-gradient(#1E90FF 0deg 60deg, #FFD700 60deg 120deg, #003366 120deg 180deg, #007A4D 180deg 240deg, #006600 240deg 300deg, #111111 300deg 360deg)',
+                          position: 'relative',
+                          overflow: 'hidden',
+                          transition: isSpinning ? 'transform 2.5s cubic-bezier(0.2, 0.8, 0.2, 1)' : 'none',
+                          transform: `rotate(${wheelRotation}deg)`,
+                        }}>
+                          {countries.map((c, i) => (
+                            <div
+                              key={i}
+                              style={{
+                                position: 'absolute',
+                                top: 0, left: 0,
+                                width: '100%', height: '100%',
+                                transform: `rotate(${i * 60 + 30}deg)`,
+                                transformOrigin: '50% 50%',
+                                display: 'flex',
+                                justifyContent: 'center',
+                                fontSize: '0.62rem',
+                                fontWeight: 700,
+                                color: '#fff',
+                                textShadow: '0 1px 2px rgba(0,0,0,0.85)',
+                              }}
+                            >
+                              <span style={{ paddingTop: 16 }}>{c.emoji}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      <button
+                        className="btn btn-primary"
+                        style={{ padding: '12px 36px', borderRadius: '20px', fontWeight: 700 }}
+                        onClick={triggerSpin}
+                        disabled={isSpinning}
+                      >
+                        {isSpinning ? '🌀 Spin-Wheel Rotating...' : '🎡 Spin Country Wheel'}
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Turn flow state 2: Country Spun, select player */}
+                  {turnSpunCountry && (
+                    <div style={{ flex: 1, width: '100%', display: 'flex', flexDirection: 'column' }} className="animate-scale-in">
+                      <div style={{ 
+                        display: 'flex', 
+                        alignItems: 'center', 
+                        justifyContent: 'center', 
+                        gap: 8, 
+                        background: 'var(--bg-secondary)', 
+                        padding: '10px 16px', 
+                        borderRadius: '8px', 
+                        border: '1px solid var(--border-subtle)',
+                        marginBottom: 16
+                      }}>
+                        <span style={{ fontSize: '1.5rem' }}>
+                          {countries.find(c => (c.fullName || c.name) === turnSpunCountry)?.emoji}
+                        </span>
+                        <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>
+                          Spun Country: {turnSpunCountry}
+                        </span>
+                        <button 
+                          className="btn-ghost" 
+                          style={{ padding: '0 4px', fontSize: '0.68rem', color: 'var(--accent-red)', cursor: 'pointer', background: 'none', border: 'none', marginLeft: 'auto' }}
+                          onClick={triggerSpin}
+                        >
+                          🔄 Respin
+                        </button>
+                      </div>
+
+                      <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: 12, fontWeight: 600 }}>
+                        Select a player matching <span style={{ color: 'var(--accent-cyan)' }}>{turnDetails.slotLabel}</span>:
+                      </div>
+
+                      {/* Player list buttons */}
+                      <div style={{ 
+                        flex: 1, 
+                        overflowY: 'auto', 
+                        maxHeight: '260px', 
+                        display: 'grid', 
+                        gridTemplateColumns: '1fr 1fr', 
+                        gap: 8, 
+                        paddingRight: 4 
+                      }}>
+                        {getAvailablePlayers(turnDetails.category, turnSpunCountry).length > 0 ? (
+                          getAvailablePlayers(turnDetails.category, turnSpunCountry).map(p => (
+                            <button
+                              key={p.name}
+                              className="btn btn-secondary btn-sm"
+                              style={{ 
+                                display: 'flex', 
+                                flexDirection: 'column', 
+                                alignItems: 'center', 
+                                justifyContent: 'center', 
+                                padding: '10px 8px', 
+                                height: 'auto', 
+                                borderRadius: '6px', 
+                                textAlign: 'center' 
+                              }}
+                              onClick={() => handleDraftPlayer(p)}
+                            >
+                              <strong style={{ fontSize: '0.82rem', color: 'var(--text-primary)' }}>{p.name}</strong>
+                              <span style={{ fontSize: '0.68rem', color: 'var(--text-tertiary)', marginTop: 2 }}>
+                                {p.role} • Rating: {p.batting.average || p.bowling.average}
+                              </span>
+                            </button>
+                          ))
+                        ) : (
+                          <div style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 0', border: '1px dashed var(--accent-red)', borderRadius: '8px' }}>
+                            <div style={{ fontSize: '0.78rem', color: 'var(--accent-red)', marginBottom: 8 }}>
+                              No available players from {turnSpunCountry} for this duty!
+                            </div>
+                            <button 
+                              className="btn btn-ghost btn-sm" 
+                              style={{ color: 'var(--accent-cyan)', fontWeight: 600 }}
+                              onClick={triggerSpin}
+                            >
+                              🔄 Respin Wheel
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Right Area: Squads side-by-side progression */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr', gap: 12, borderBottom: '1px solid var(--border-subtle)', paddingBottom: 6 }}>
+                    <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>{draftTeam1Name}</div>
+                    <div style={{ textAlign: 'center', fontWeight: 700, fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>Slot</div>
+                    <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>{draftTeam2Name}</div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '380px', overflowY: 'auto', paddingRight: 4 }}>
+                    {DRAFT_SLOTS.map(slot => {
+                      const p1 = draftTeam1Players[slot.id];
+                      const p2 = draftTeam2Players[slot.id];
+                      
+                      const isCurrentSlot1 = turnDetails.teamKey === 'team1' && turnDetails.slotId === slot.id;
+                      const isCurrentSlot2 = turnDetails.teamKey === 'team2' && turnDetails.slotId === slot.id;
+
+                      return (
+                        <div key={slot.id} style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr', gap: 12, alignItems: 'center' }}>
+                          {/* Team A drafted player */}
+                          <div style={{
+                            background: isCurrentSlot1 ? 'rgba(99, 102, 241, 0.12)' : 'var(--bg-secondary)',
+                            border: isCurrentSlot1 ? '1px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
+                            padding: '6px 10px',
+                            borderRadius: '6px',
+                            minHeight: '34px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            fontSize: '0.78rem'
+                          }}>
+                            {p1 ? (
+                              <span>{p1.teamEmoji} {p1.name}</span>
+                            ) : (
+                              <span style={{ color: 'var(--text-tertiary)', fontSize: '0.72rem', fontStyle: 'italic' }}>
+                                {isCurrentSlot1 ? '📝 Select now...' : 'waiting...'}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Slot Duty Label */}
+                          <div style={{
+                            textAlign: 'center',
+                            fontSize: '0.7rem',
+                            fontWeight: 700,
+                            textTransform: 'uppercase',
+                            background: 'var(--bg-primary)',
+                            padding: '4px',
+                            borderRadius: '4px',
+                            border: '1px solid var(--border-subtle)',
+                            color: 'var(--text-secondary)'
+                          }}>
+                            {slot.label.split(' ').pop()}
+                          </div>
+
+                          {/* Team B drafted player */}
+                          <div style={{
+                            background: isCurrentSlot2 ? 'rgba(6, 182, 212, 0.12)' : 'var(--bg-secondary)',
+                            border: isCurrentSlot2 ? '1px solid var(--accent-cyan)' : '1px solid var(--border-subtle)',
+                            padding: '6px 10px',
+                            borderRadius: '6px',
+                            minHeight: '34px',
+                            display: 'flex',
+                            alignItems: 'center',
+                            fontSize: '0.78rem'
+                          }}>
+                            {p2 ? (
+                              <span>{p2.teamEmoji} {p2.name}</span>
+                            ) : (
+                              <span style={{ color: 'var(--text-tertiary)', fontSize: '0.72rem', fontStyle: 'italic' }}>
+                                {isCurrentSlot2 ? '📝 Select now...' : 'waiting...'}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* STAGE 4: DRAFT COMPLETED */}
+            {draftStage === 'complete' && (
+              <div style={{ padding: 'var(--space-md)' }} className="animate-fade-in">
+                <div className="setup-section-title" style={{ marginBottom: 16 }}>
+                  <span>🏆 Custom Draft Completed!</span>
+                </div>
+                <p style={{ color: 'var(--text-tertiary)', fontSize: '0.82rem', marginBottom: 24, textAlign: 'center' }}>
+                  Both squads have been drafted using the Spin Wheel. Review your teams below:
+                </p>
+
+                {/* Squad reviews */}
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 24, marginBottom: 32 }}>
+                  {/* Team A */}
+                  <div className="card" style={{ padding: '20px', border: '1px solid var(--border-subtle)', background: 'var(--bg-secondary)' }}>
+                    <h4 style={{ color: 'var(--accent-primary)', borderBottom: '1px solid var(--border-subtle)', paddingBottom: 8, marginBottom: 12 }}>
+                      🛡️ {draftTeam1Name}
+                    </h4>
+                    <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {draftTeam1Players.map((p, i) => (
+                        <li key={i} style={{ fontSize: '0.82rem', display: 'flex', justifyContent: 'space-between' }}>
+                          <span>{p?.teamEmoji} {p?.name}</span>
+                          <span style={{ color: 'var(--text-tertiary)', fontSize: '0.72rem' }}>{DRAFT_SLOTS[i].label}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  {/* Team B */}
+                  <div className="card" style={{ padding: '20px', border: '1px solid var(--border-subtle)', background: 'var(--bg-secondary)' }}>
+                    <h4 style={{ color: 'var(--accent-cyan)', borderBottom: '1px solid var(--border-subtle)', paddingBottom: 8, marginBottom: 12 }}>
+                      ⚔️ {draftTeam2Name}
+                    </h4>
+                    <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {draftTeam2Players.map((p, i) => (
+                        <li key={i} style={{ fontSize: '0.82rem', display: 'flex', justifyContent: 'space-between' }}>
+                          <span>{p?.teamEmoji} {p?.name}</span>
+                          <span style={{ color: 'var(--text-tertiary)', fontSize: '0.72rem' }}>{DRAFT_SLOTS[i].label}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'center', gap: 16 }}>
+                  <button 
+                    className="btn btn-secondary" 
+                    style={{ padding: '12px 28px', borderRadius: '20px' }}
+                    onClick={handleResetDraft}
+                  >
+                    🔄 Restart Draft
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Format Selector (only show in preset mode OR draft mode stage complete) */}
+        {(mode === 'preset' || draftStage === 'complete') && (
+          <div className="setup-section animate-fade-in" id="section-format">
+            <div className="setup-section-title">
+              <span>📋 Match Format</span>
+            </div>
+            <div className="format-options">
+              {formatCards.map(f => (
+                <div
+                  key={f.key}
+                  className={`format-card ${format === f.key ? 'active' : ''}`}
+                  onClick={() => setFormat(f.key)}
+                  role="button"
+                  tabIndex={0}
+                  id={`format-${f.key}`}
+                >
+                  <div className="format-card-icon">{f.icon}</div>
+                  <h3>{f.label}</h3>
+                  <p>{f.desc}</p>
+                  <p style={{ marginTop: 8, fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
+                    {FORMATS[f.key].overs} overs {f.key === 'TEST' ? '/ day' : ''}
+                  </p>
+                </div>
+              ))}
             </div>
           </div>
         )}
 
-        {/* Format */}
-        <div className="setup-section" id="section-format">
-          <div className="setup-section-title">
-            <span>📋 Match Format</span>
-          </div>
-          <div className="format-options">
-            {formatCards.map(f => (
-              <div
-                key={f.key}
-                className={`format-card ${format === f.key ? 'active' : ''}`}
-                onClick={() => setFormat(f.key)}
-                role="button"
-                tabIndex={0}
-                id={`format-${f.key}`}
-              >
-                <div className="format-card-icon">{f.icon}</div>
-                <h3>{f.label}</h3>
-                <p>{f.desc}</p>
-                <p style={{ marginTop: 8, fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
-                  {FORMATS[f.key].overs} overs {f.key === 'TEST' ? '/ day' : ''}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Stadium */}
-        <div className="setup-section" id="section-stadium">
-          <div className="setup-section-title">
-            <span>🏟️ Select Stadium</span>
-          </div>
-          <div className="stadium-grid">
-            {Object.entries(stadiumsByCountry).map(([country, stadiums]) =>
-              stadiums.map(s => (
-                <div
-                  key={s.name}
-                  className={`stadium-card ${stadium === s.name ? 'active' : ''}`}
-                  onClick={() => setStadium(s.name)}
-                  role="button"
-                  tabIndex={0}
-                  id={`stadium-${s.name.replace(/\s/g, '-')}`}
-                >
-                  <div className="stadium-card-header">
-                    <span className="stadium-emoji">{s.emoji}</span>
-                    <span className="stadium-name">{s.name}</span>
-                  </div>
-                  <div className="stadium-city">{s.city}, {s.country}</div>
-                  <div className="stadium-stats">
-                    <span className="stadium-stat">
-                      {format === 'T20' ? `T20: ${s.avgT20Score}` : format === 'ODI' ? `ODI: ${s.avgODIScore}` : `Test: ${s.avgTestScore}`}
-                    </span>
-                    <span className="stadium-stat">{s.pitchType.replace(/_/g, ' ').toLowerCase()}</span>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        {/* Start */}
-        <div className="setup-start">
-          <button
-            className="start-btn"
-            onClick={handleStart}
-            disabled={!canStart}
-            id="btn-start-match"
-          >
-            🏏 Simulate Match
-          </button>
-          {!canStart && (
-            <p style={{ color: 'var(--text-tertiary)', fontSize: '0.82rem', marginTop: 12 }}>
-              {mode === 'preset' 
-                ? 'Please select two different teams, a format, and a stadium' 
-                : 'Please spin and select all 11 players for both teams, a format, and a stadium'}
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* ─── SPIN THE WHEEL MODAL ──────────────────────────────────────────────── */}
-      {spinningSlot && (
-        <div style={{
-          position: 'fixed',
-          top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(5, 5, 10, 0.88)',
-          backdropFilter: 'blur(8px)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          zIndex: 1000,
-        }}>
-          <div className="card" style={{
-            width: '420px',
-            padding: '32px',
-            textAlign: 'center',
-            border: '1px solid var(--border-medium)',
-            background: 'var(--glass-bg)',
-            boxShadow: 'var(--shadow-lg)',
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            position: 'relative'
-          }}>
-            <h3 style={{ marginBottom: 8, fontSize: '1.1rem' }}>🎯 Country Selection Spin</h3>
-            <p style={{ color: 'var(--text-tertiary)', fontSize: '0.78rem', marginBottom: 24 }}>
-              Spinning for <strong>{spinningSlot.team === 'team1' ? draftTeam1Name : draftTeam2Name}</strong> — Duty: <strong>{DRAFT_SLOTS[spinningSlot.slotId].label}</strong>
-            </p>
-
-            {/* Spinner Board Container */}
-            <div style={{ position: 'relative', margin: '20px 0', width: '320px', height: '320px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-              {/* Top Pointer */}
-              <div style={{
-                position: 'absolute',
-                top: '-5px',
-                left: 'calc(50% - 15px)',
-                width: 0, height: 0,
-                borderLeft: '15px solid transparent',
-                borderRight: '15px solid transparent',
-                borderTop: '25px solid var(--accent-red)',
-                zIndex: 10,
-                filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.5))'
-              }} />
-
-              {/* The Wheel */}
-              <div style={{
-                width: '300px',
-                height: '300px',
-                borderRadius: '50%',
-                border: '8px solid var(--border-medium)',
-                boxShadow: '0 0 25px rgba(99, 102, 241, 0.35), inset 0 0 15px rgba(0,0,0,0.6)',
-                background: 'conic-gradient(#1E90FF 0deg 60deg, #FFD700 60deg 120deg, #003366 120deg 180deg, #007A4D 180deg 240deg, #006600 240deg 300deg, #111111 300deg 360deg)',
-                position: 'relative',
-                overflow: 'hidden',
-                transition: isSpinning ? 'transform 2.5s cubic-bezier(0.2, 0.8, 0.2, 1)' : 'none',
-                transform: `rotate(${wheelRotation}deg)`,
-              }}>
-                {/* Sector Dividers */}
-                {countries.map((_, i) => (
+        {/* Stadium Selector (only show in preset mode OR draft mode stage complete) */}
+        {(mode === 'preset' || draftStage === 'complete') && (
+          <div className="setup-section animate-fade-in" id="section-stadium">
+            <div className="setup-section-title">
+              <span>🏟️ Select Stadium</span>
+            </div>
+            <div className="stadium-grid">
+              {Object.entries(stadiumsByCountry).map(([country, stadiums]) =>
+                stadiums.map(s => (
                   <div
-                    key={`line-${i}`}
-                    style={{
-                      position: 'absolute',
-                      top: 0, left: '149px',
-                      width: '2px', height: '150px',
-                      background: 'rgba(255, 255, 255, 0.25)',
-                      transform: `rotate(${i * 60}deg)`,
-                      transformOrigin: '1px 150px',
-                      zIndex: 2,
-                    }}
-                  />
-                ))}
-
-                {/* Sector Labels */}
-                {countries.map((c, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      position: 'absolute',
-                      top: 0, left: 0,
-                      width: '100%', height: '100%',
-                      transform: `rotate(${i * 60 + 30}deg)`,
-                      transformOrigin: '50% 50%',
-                      display: 'flex',
-                      justifyContent: 'center',
-                      zIndex: 3
-                    }}
+                    key={s.name}
+                    className={`stadium-card ${stadium === s.name ? 'active' : ''}`}
+                    onClick={() => setStadium(s.name)}
+                    role="button"
+                    tabIndex={0}
+                    id={`stadium-${s.name.replace(/\s/g, '-')}`}
                   >
-                    <div style={{
-                      paddingTop: '24px',
-                      color: '#ffffff',
-                      fontSize: '0.78rem',
-                      fontWeight: 700,
-                      textShadow: '0 2px 4px rgba(0,0,0,0.85), 0 0 2px rgba(0,0,0,0.85)',
-                      textAlign: 'center',
-                    }}>
-                      <div style={{ fontSize: '1.25rem', marginBottom: 2 }}>{c.emoji}</div>
-                      <div>{c.name}</div>
+                    <div className="stadium-card-header">
+                      <span className="stadium-emoji">{s.emoji}</span>
+                      <span className="stadium-name">{s.name}</span>
+                    </div>
+                    <div className="stadium-city">{s.city}, {s.country}</div>
+                    <div className="stadium-stats">
+                      <span className="stadium-stat">
+                        {format === 'T20' ? `T20: ${s.avgT20Score}` : format === 'ODI' ? `ODI: ${s.avgODIScore}` : `Test: ${s.avgTestScore}`}
+                      </span>
+                      <span className="stadium-stat">{s.pitchType.replace(/_/g, ' ').toLowerCase()}</span>
                     </div>
                   </div>
-                ))}
-
-                {/* Casino glowing lights on outer rim */}
-                {Array.from({ length: 12 }).map((_, idx) => (
-                  <div
-                    key={`bulb-${idx}`}
-                    style={{
-                      position: 'absolute',
-                      top: '4px', left: '144px',
-                      width: '12px', height: '12px',
-                      borderRadius: '50%',
-                      background: '#ffffff',
-                      boxShadow: '0 0 8px #ffffff, 0 0 15px #ffe066',
-                      transform: `rotate(${idx * 30}deg)`,
-                      transformOrigin: '6px 146px',
-                      zIndex: 4,
-                    }}
-                  />
-                ))}
-
-                {/* Inner Center Circle Peg */}
-                <div style={{
-                  position: 'absolute',
-                  top: '120px', left: '120px',
-                  width: '60px', height: '60px',
-                  borderRadius: '50%',
-                  background: 'radial-gradient(circle, #ffe066 0%, #ca8a04 100%)',
-                  border: '4px solid #ffffff',
-                  boxShadow: '0 4px 10px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.6)',
-                  zIndex: 5,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  color: '#ffffff',
-                  fontSize: '1.1rem',
-                  fontWeight: 'bold',
-                }}>
-                  🏏
-                </div>
-              </div>
-            </div>
-
-            {/* Spin / Status Panel */}
-            <div style={{ marginTop: 12, height: '60px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-              {selectedCountryResult ? (
-                <div className="animate-scale-in" style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--accent-green)' }}>
-                  🎉 {selectedCountryResult.emoji} {selectedCountryResult.name}!
-                </div>
-              ) : (
-                <button
-                  className="btn btn-primary"
-                  style={{ padding: '12px 32px', fontSize: '0.9rem', fontWeight: 600, borderRadius: '20px' }}
-                  onClick={triggerSpin}
-                  disabled={isSpinning}
-                >
-                  {isSpinning ? '🌀 Spinning...' : '🎰 Spin the Wheel'}
-                </button>
+                ))
               )}
             </div>
           </div>
-        </div>
-      )}
+        )}
+
+        {/* Start Button (only show in preset mode OR draft mode stage complete) */}
+        {(mode === 'preset' || draftStage === 'complete') && (
+          <div className="setup-start" style={{ gridColumn: 'span 2' }}>
+            <button
+              className="start-btn"
+              onClick={handleStart}
+              disabled={!canStart}
+              id="btn-start-match"
+            >
+              🏏 Simulate Match
+            </button>
+            {!canStart && (
+              <p style={{ color: 'var(--text-tertiary)', fontSize: '0.82rem', marginTop: 12 }}>
+                {mode === 'preset' 
+                  ? 'Please select two different teams, a format, and a stadium' 
+                  : 'Please draft all 11 players for both teams, a format, and a stadium'}
+              </p>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
