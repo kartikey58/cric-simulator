@@ -7,7 +7,7 @@ export default function LiveMatch({ matchData, config, onShowResult }) {
   const [activeInnings, setActiveInnings] = useState(1);
   const [visibleBalls, setVisibleBalls] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
-  const [speed, setSpeed] = useState(50); // ms per ball
+  const [speed, setSpeed] = useState(1200); // ms per ball
   const commentaryRef = useRef(null);
   const timerRef = useRef(null);
 
@@ -206,9 +206,15 @@ export default function LiveMatch({ matchData, config, onShowResult }) {
           <strong>{matchData.toss.winner}</strong>
           <span>elected to {matchData.toss.decision}</span>
         </div>
-        <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-ghost btn-sm" onClick={() => setSpeed(s => Math.max(10, s - 20))} id="btn-speed-up">
-            ⏩
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <button className="btn btn-ghost btn-sm" onClick={() => setSpeed(s => Math.min(3000, s + 200))} id="btn-slow-down" title="Slower">
+            🐌
+          </button>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', alignSelf: 'center', minWidth: '40px', textAlign: 'center' }} className="mono">
+            {(speed / 1000).toFixed(1)}s
+          </span>
+          <button className="btn btn-ghost btn-sm" onClick={() => setSpeed(s => Math.max(100, s - 200))} id="btn-speed-up" title="Faster">
+            ⚡
           </button>
           <button className="btn btn-ghost btn-sm" onClick={() => setIsPlaying(p => !p)} id="btn-play-pause">
             {isPlaying ? '⏸' : '▶️'}
