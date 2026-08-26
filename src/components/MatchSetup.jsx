@@ -446,10 +446,58 @@ export default function MatchSetup({ onStartMatch }) {
 
             {/* STAGE 3: LIVE DRAFTING GAME */}
             {draftStage === 'drafting' && turnDetails && (
-              <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: 32, padding: 'var(--space-md)' }}>
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '260px 1fr 260px',
+                gap: 20,
+                padding: '10px 0',
+                alignItems: 'start',
+                width: '100%'
+              }}>
                 
-                {/* Left Area: Live Turn & Spun Country Selector */}
-                <div className="card" style={{ padding: '24px', background: 'var(--glass-bg)', border: '1px solid var(--border-medium)', minHeight: '420px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                {/* 1. Left Sidebar: Team A Squad Progression */}
+                <div className="card" style={{ padding: '16px', background: 'var(--glass-bg)', border: '1px solid var(--border-medium)', borderRadius: '12px' }}>
+                  <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--accent-primary)', borderBottom: '2px solid var(--accent-primary)', paddingBottom: 8, marginBottom: 16, textAlign: 'center' }}>
+                    🛡️ {draftTeam1Name}
+                  </h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {DRAFT_SLOTS.map((slot) => {
+                      const p = draftTeam1Players[slot.id];
+                      const isCurrent = turnDetails.teamKey === 'team1' && turnDetails.slotId === slot.id;
+                      return (
+                        <div key={slot.id} style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          background: isCurrent ? 'rgba(99, 102, 241, 0.15)' : 'var(--bg-secondary)',
+                          border: isCurrent ? '1.5px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
+                          boxShadow: isCurrent ? '0 0 10px rgba(99, 102, 241, 0.25)' : 'none',
+                          padding: '6px 10px',
+                          borderRadius: '8px',
+                          minHeight: '44px',
+                          transition: 'all 0.2s ease'
+                        }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                            <span style={{ fontSize: '0.62rem', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>
+                              {slot.label}
+                            </span>
+                            <span style={{ fontSize: '0.8rem', fontWeight: p ? 600 : 400, color: p ? 'var(--text-primary)' : 'var(--text-tertiary)', fontStyle: p ? 'normal' : 'italic' }}>
+                              {p ? `${p.teamEmoji} ${p.name}` : (isCurrent ? '📝 Drafting...' : 'waiting...')}
+                            </span>
+                          </div>
+                          {p && (
+                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--accent-green)', background: 'rgba(16, 185, 129, 0.12)', padding: '2px 4px', borderRadius: '4px' }}>
+                              ★ {p.batting.average || p.bowling.average}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 2. Center Column: Active Drafting Control Hub */}
+                <div className="card" style={{ padding: '24px', background: 'var(--glass-bg)', border: '1px solid var(--border-medium)', minHeight: '480px', display: 'flex', flexDirection: 'column', alignItems: 'center', borderRadius: '12px' }}>
                   <div style={{ width: '100%', borderBottom: '1px solid var(--border-subtle)', paddingBottom: 12, marginBottom: 20 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <span className="badge badge-primary" style={{ fontSize: '0.7rem' }}>Pick {currentTurn + 1} / 22</span>
@@ -461,39 +509,57 @@ export default function MatchSetup({ onStartMatch }) {
                         ❌ Cancel Draft
                       </button>
                     </div>
-                    <h3 style={{ marginTop: 8, fontSize: '1.15rem' }}>
+                    <h3 style={{ marginTop: 8, fontSize: '1.2rem', fontWeight: 800, textAlign: 'center' }}>
                       ⚔️ {turnDetails.teamName} Turn
                     </h3>
-                    <p style={{ color: 'var(--text-tertiary)', fontSize: '0.78rem', marginTop: 4 }}>
-                      Drafting Duty: <strong style={{ color: 'var(--accent-cyan)' }}>{turnDetails.slotLabel}</strong>
+                    <p style={{ color: 'var(--text-tertiary)', fontSize: '0.82rem', marginTop: 4, textAlign: 'center' }}>
+                      Drafting Duty: <strong style={{ color: turnDetails.teamKey === 'team1' ? 'var(--accent-primary-light)' : 'var(--accent-cyan)' }}>{turnDetails.slotLabel}</strong>
                     </p>
                   </div>
 
-                  {/* Turn flow state 1: Spin country */}
+                  {/* Flow State A: Spin country wheel */}
                   {!turnSpunCountry && (
                     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
-                      {/* Interactive conic gradient selector wheel */}
-                      <div style={{ position: 'relative', width: '220px', height: '220px', marginBottom: 20 }}>
+                      <div style={{ position: 'relative', width: '220px', height: '220px', marginBottom: 24, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+                        {/* Wheel Pointer */}
                         <div style={{
                           position: 'absolute',
-                          top: '-6px', left: 'calc(50% - 10px)',
+                          top: '-8px', left: 'calc(50% - 10px)',
                           width: 0, height: 0,
                           borderLeft: '10px solid transparent',
                           borderRight: '10px solid transparent',
                           borderTop: '18px solid var(--accent-red)',
-                          zIndex: 10
+                          zIndex: 10,
+                          filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))'
                         }} />
+                        {/* Wheel Graphic */}
                         <div style={{
                           width: '200px', height: '200px',
                           borderRadius: '50%',
-                          border: '5px solid var(--border-medium)',
-                          boxShadow: '0 0 15px rgba(99, 102, 241, 0.2), inset 0 0 8px rgba(0,0,0,0.5)',
+                          border: '6px solid var(--border-medium)',
+                          boxShadow: '0 0 15px rgba(99, 102, 241, 0.25), inset 0 0 10px rgba(0,0,0,0.6)',
                           background: 'conic-gradient(#1E90FF 0deg 60deg, #FFD700 60deg 120deg, #003366 120deg 180deg, #007A4D 180deg 240deg, #006600 240deg 300deg, #111111 300deg 360deg)',
                           position: 'relative',
                           overflow: 'hidden',
                           transition: isSpinning ? 'transform 2.5s cubic-bezier(0.2, 0.8, 0.2, 1)' : 'none',
                           transform: `rotate(${wheelRotation}deg)`,
                         }}>
+                          {/* Sector Divider lines */}
+                          {countries.map((_, i) => (
+                            <div
+                              key={`line-${i}`}
+                              style={{
+                                position: 'absolute',
+                                top: 0, left: '99px',
+                                width: '2px', height: '100px',
+                                background: 'rgba(255, 255, 255, 0.25)',
+                                transform: `rotate(${i * 60}deg)`,
+                                transformOrigin: '1px 100px',
+                                zIndex: 2,
+                              }}
+                            />
+                          ))}
+                          {/* Labels */}
                           {countries.map((c, i) => (
                             <div
                               key={i}
@@ -501,33 +567,51 @@ export default function MatchSetup({ onStartMatch }) {
                                 position: 'absolute',
                                 top: 0, left: 0,
                                 width: '100%', height: '100%',
-                                transform: `rotate(${i * 60 + 30}deg)`,
+                                transform: `rotate(${i * 60 + 90}deg)`, // Fixed rotation offset
                                 transformOrigin: '50% 50%',
                                 display: 'flex',
                                 justifyContent: 'center',
-                                fontSize: '0.62rem',
-                                fontWeight: 700,
+                                fontSize: '0.68rem',
+                                fontWeight: 800,
                                 color: '#fff',
                                 textShadow: '0 1px 2px rgba(0,0,0,0.85)',
+                                zIndex: 3
                               }}
                             >
-                              <span style={{ paddingTop: 16 }}>{c.emoji}</span>
+                              <span style={{ paddingTop: 12 }}>{c.emoji}</span>
                             </div>
                           ))}
+                          {/* Center peg */}
+                          <div style={{
+                            position: 'absolute',
+                            top: '80px', left: '80px',
+                            width: '40px', height: '40px',
+                            borderRadius: '50%',
+                            background: 'radial-gradient(circle, #ffe066 0%, #ca8a04 100%)',
+                            border: '3px solid #ffffff',
+                            boxShadow: '0 2px 5px rgba(0,0,0,0.5)',
+                            zIndex: 5,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: '0.8rem'
+                          }}>
+                            🏏
+                          </div>
                         </div>
                       </div>
                       <button
                         className="btn btn-primary"
-                        style={{ padding: '12px 36px', borderRadius: '20px', fontWeight: 700 }}
+                        style={{ padding: '12px 36px', borderRadius: '25px', fontWeight: 700, fontSize: '0.9rem' }}
                         onClick={triggerSpin}
                         disabled={isSpinning}
                       >
-                        {isSpinning ? '🌀 Spin-Wheel Rotating...' : '🎡 Spin Country Wheel'}
+                        {isSpinning ? '🌀 Spinning...' : '🎡 Spin Country Wheel'}
                       </button>
                     </div>
                   )}
 
-                  {/* Turn flow state 2: Country Spun, select player */}
+                  {/* Flow State B: Country Spun, select player */}
                   {turnSpunCountry && (
                     <div style={{ flex: 1, width: '100%', display: 'flex', flexDirection: 'column' }} className="animate-scale-in">
                       <div style={{ 
@@ -542,68 +626,86 @@ export default function MatchSetup({ onStartMatch }) {
                         marginBottom: 16
                       }}>
                         <span style={{ fontSize: '1.5rem' }}>
-                          {countries.find(c => (c.fullName || c.name) === turnSpunCountry)?.emoji}
+                          {countries.find(c => c.name === turnSpunCountry)?.emoji}
                         </span>
-                        <span style={{ fontWeight: 700, fontSize: '0.9rem' }}>
-                          Spun Country: {turnSpunCountry}
+                        <span style={{ fontWeight: 800, fontSize: '0.92rem' }}>
+                          Country Spun: {turnSpunCountry}
                         </span>
                         <button 
                           className="btn-ghost" 
-                          style={{ padding: '0 4px', fontSize: '0.68rem', color: 'var(--accent-red)', cursor: 'pointer', background: 'none', border: 'none', marginLeft: 'auto' }}
+                          style={{ padding: '0 4px', fontSize: '0.68rem', color: 'var(--accent-red)', cursor: 'pointer', background: 'none', border: 'none', marginLeft: 'auto', fontWeight: 600 }}
                           onClick={triggerSpin}
                         >
-                          🔄 Respin
+                          Respin 🔄
                         </button>
                       </div>
 
                       <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: 12, fontWeight: 600 }}>
-                        Select a player matching <span style={{ color: 'var(--accent-cyan)' }}>{turnDetails.slotLabel}</span>:
+                        Select a player from {turnSpunCountry} for <span style={{ color: 'var(--accent-cyan)' }}>{turnDetails.slotLabel}</span>:
                       </div>
 
-                      {/* Player list buttons */}
+                      {/* Player Grid Cards */}
                       <div style={{ 
                         flex: 1, 
                         overflowY: 'auto', 
-                        maxHeight: '260px', 
+                        maxHeight: '280px', 
                         display: 'grid', 
                         gridTemplateColumns: '1fr 1fr', 
-                        gap: 8, 
+                        gap: 10, 
                         paddingRight: 4 
                       }}>
                         {getAvailablePlayers(turnDetails.category, turnSpunCountry).length > 0 ? (
                           getAvailablePlayers(turnDetails.category, turnSpunCountry).map(p => (
-                            <button
+                            <div
                               key={p.name}
-                              className="btn btn-secondary btn-sm"
+                              onClick={() => handleDraftPlayer(p)}
                               style={{ 
                                 display: 'flex', 
                                 flexDirection: 'column', 
-                                alignItems: 'center', 
-                                justifyContent: 'center', 
-                                padding: '10px 8px', 
-                                height: 'auto', 
-                                borderRadius: '6px', 
-                                textAlign: 'center' 
+                                alignItems: 'flex-start',
+                                padding: '12px 14px', 
+                                borderRadius: '8px', 
+                                border: '1.5px solid var(--border-subtle)',
+                                background: 'var(--bg-secondary)',
+                                cursor: 'pointer',
+                                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                                position: 'relative'
                               }}
-                              onClick={() => handleDraftPlayer(p)}
+                              onMouseEnter={(e) => {
+                                e.currentTarget.style.borderColor = 'var(--accent-primary)';
+                                e.currentTarget.style.background = 'rgba(99, 102, 241, 0.05)';
+                                e.currentTarget.style.transform = 'translateY(-2px)';
+                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(99, 102, 241, 0.15)';
+                              }}
+                              onMouseLeave={(e) => {
+                                e.currentTarget.style.borderColor = 'var(--border-subtle)';
+                                e.currentTarget.style.background = 'var(--bg-secondary)';
+                                e.currentTarget.style.transform = 'translateY(0)';
+                                e.currentTarget.style.boxShadow = 'none';
+                              }}
                             >
-                              <strong style={{ fontSize: '0.82rem', color: 'var(--text-primary)' }}>{p.name}</strong>
-                              <span style={{ fontSize: '0.68rem', color: 'var(--text-tertiary)', marginTop: 2 }}>
-                                {p.role} • Rating: {p.batting.average || p.bowling.average}
+                              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
+                                <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>{p.name}</strong>
+                                <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--accent-amber)', background: 'rgba(245, 158, 11, 0.15)', padding: '1px 5px', borderRadius: '4px' }}>
+                                  ★{p.batting.average || p.bowling.average}
+                                </span>
+                              </div>
+                              <span style={{ fontSize: '0.68rem', color: 'var(--text-tertiary)', marginTop: 4 }}>
+                                {p.role} • {p.bowling.type.replace(/_/g, ' ')}
                               </span>
-                            </button>
+                            </div>
                           ))
                         ) : (
                           <div style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 0', border: '1px dashed var(--accent-red)', borderRadius: '8px' }}>
-                            <div style={{ fontSize: '0.78rem', color: 'var(--accent-red)', marginBottom: 8 }}>
-                              No available players from {turnSpunCountry} for this duty!
+                            <div style={{ fontSize: '0.78rem', color: 'var(--accent-red)', marginBottom: 8, fontWeight: 600 }}>
+                              No players left from {turnSpunCountry} for this duty!
                             </div>
                             <button 
-                              className="btn btn-ghost btn-sm" 
-                              style={{ color: 'var(--accent-cyan)', fontWeight: 600 }}
+                              className="btn btn-secondary btn-sm" 
+                              style={{ fontWeight: 700 }}
                               onClick={triggerSpin}
                             >
-                              🔄 Respin Wheel
+                              🔄 Spin Again
                             </button>
                           </div>
                         )}
@@ -612,83 +714,47 @@ export default function MatchSetup({ onStartMatch }) {
                   )}
                 </div>
 
-                {/* Right Area: Squads side-by-side progression */}
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr', gap: 12, borderBottom: '1px solid var(--border-subtle)', paddingBottom: 6 }}>
-                    <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>{draftTeam1Name}</div>
-                    <div style={{ textAlign: 'center', fontWeight: 700, fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>Slot</div>
-                    <div style={{ fontWeight: 700, fontSize: '0.82rem', color: 'var(--text-secondary)' }}>{draftTeam2Name}</div>
-                  </div>
-
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '380px', overflowY: 'auto', paddingRight: 4 }}>
-                    {DRAFT_SLOTS.map(slot => {
-                      const p1 = draftTeam1Players[slot.id];
-                      const p2 = draftTeam2Players[slot.id];
-                      
-                      const isCurrentSlot1 = turnDetails.teamKey === 'team1' && turnDetails.slotId === slot.id;
-                      const isCurrentSlot2 = turnDetails.teamKey === 'team2' && turnDetails.slotId === slot.id;
-
+                {/* 3. Right Sidebar: Team B Squad Progression */}
+                <div className="card" style={{ padding: '16px', background: 'var(--glass-bg)', border: '1px solid var(--border-medium)', borderRadius: '12px' }}>
+                  <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: 'var(--accent-cyan)', borderBottom: '2px solid var(--accent-cyan)', paddingBottom: 8, marginBottom: 16, textAlign: 'center' }}>
+                    ⚔️ {draftTeam2Name}
+                  </h4>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {DRAFT_SLOTS.map((slot) => {
+                      const p = draftTeam2Players[slot.id];
+                      const isCurrent = turnDetails.teamKey === 'team2' && turnDetails.slotId === slot.id;
                       return (
-                        <div key={slot.id} style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr', gap: 12, alignItems: 'center' }}>
-                          {/* Team A drafted player */}
-                          <div style={{
-                            background: isCurrentSlot1 ? 'rgba(99, 102, 241, 0.12)' : 'var(--bg-secondary)',
-                            border: isCurrentSlot1 ? '1px solid var(--accent-primary)' : '1px solid var(--border-subtle)',
-                            padding: '6px 10px',
-                            borderRadius: '6px',
-                            minHeight: '34px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            fontSize: '0.78rem'
-                          }}>
-                            {p1 ? (
-                              <span>{p1.teamEmoji} {p1.name}</span>
-                            ) : (
-                              <span style={{ color: 'var(--text-tertiary)', fontSize: '0.72rem', fontStyle: 'italic' }}>
-                                {isCurrentSlot1 ? '📝 Select now...' : 'waiting...'}
-                              </span>
-                            )}
+                        <div key={slot.id} style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          background: isCurrent ? 'rgba(6, 182, 212, 0.15)' : 'var(--bg-secondary)',
+                          border: isCurrent ? '1.5px solid var(--accent-cyan)' : '1px solid var(--border-subtle)',
+                          boxShadow: isCurrent ? '0 0 10px rgba(6, 182, 212, 0.25)' : 'none',
+                          padding: '6px 10px',
+                          borderRadius: '8px',
+                          minHeight: '44px',
+                          transition: 'all 0.2s ease'
+                        }}>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                            <span style={{ fontSize: '0.62rem', fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase' }}>
+                              {slot.label}
+                            </span>
+                            <span style={{ fontSize: '0.8rem', fontWeight: p ? 600 : 400, color: p ? 'var(--text-primary)' : 'var(--text-tertiary)', fontStyle: p ? 'normal' : 'italic' }}>
+                              {p ? `${p.teamEmoji} ${p.name}` : (isCurrent ? '📝 Drafting...' : 'waiting...')}
+                            </span>
                           </div>
-
-                          {/* Slot Duty Label */}
-                          <div style={{
-                            textAlign: 'center',
-                            fontSize: '0.7rem',
-                            fontWeight: 700,
-                            textTransform: 'uppercase',
-                            background: 'var(--bg-primary)',
-                            padding: '4px',
-                            borderRadius: '4px',
-                            border: '1px solid var(--border-subtle)',
-                            color: 'var(--text-secondary)'
-                          }}>
-                            {slot.label.split(' ').pop()}
-                          </div>
-
-                          {/* Team B drafted player */}
-                          <div style={{
-                            background: isCurrentSlot2 ? 'rgba(6, 182, 212, 0.12)' : 'var(--bg-secondary)',
-                            border: isCurrentSlot2 ? '1px solid var(--accent-cyan)' : '1px solid var(--border-subtle)',
-                            padding: '6px 10px',
-                            borderRadius: '6px',
-                            minHeight: '34px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            fontSize: '0.78rem'
-                          }}>
-                            {p2 ? (
-                              <span>{p2.teamEmoji} {p2.name}</span>
-                            ) : (
-                              <span style={{ color: 'var(--text-tertiary)', fontSize: '0.72rem', fontStyle: 'italic' }}>
-                                {isCurrentSlot2 ? '📝 Select now...' : 'waiting...'}
-                              </span>
-                            )}
-                          </div>
+                          {p && (
+                            <span style={{ fontSize: '0.68rem', fontWeight: 800, color: 'var(--accent-green)', background: 'rgba(16, 185, 129, 0.12)', padding: '2px 4px', borderRadius: '4px' }}>
+                              ★ {p.batting.average || p.bowling.average}
+                            </span>
+                          )}
                         </div>
                       );
                     })}
                   </div>
                 </div>
+
               </div>
             )}
 
