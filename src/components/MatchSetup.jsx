@@ -921,14 +921,14 @@ export default function MatchSetup({ onStartMatch }) {
               {/* Top-Right Red Pointer (at 45deg pointing inwards) */}
               <div style={{
                 position: 'absolute',
-                top: '12px',
-                right: '12px',
+                top: '35px',
+                right: '35px',
                 width: 0, height: 0,
                 borderLeft: '14px solid transparent',
                 borderRight: '14px solid transparent',
                 borderTop: '28px solid #ef4444',
                 zIndex: 10,
-                transform: 'rotate(-45deg)',
+                transform: 'rotate(45deg)',
                 transformOrigin: '50% 0%',
                 filter: 'drop-shadow(-2px 4px 4px rgba(0,0,0,0.5))'
               }} />
