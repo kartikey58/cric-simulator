@@ -702,8 +702,6 @@ export function simulateInnings({
 
   // ── Batting order ────────────────────────────────────────────────
   const battingOrder = [...battingPlayersMapped];
-  const roleOrder = { 'Batsman': 0, 'Wicket-Keeper': 1, 'All-Rounder': 2, 'Bowler': 3 };
-  battingOrder.sort((a, b) => (roleOrder[a.role] || 3) - (roleOrder[b.role] || 3));
 
   // ── Bowling rotation ─────────────────────────────────────────────
   const bowlers = bowlingPlayersMapped.filter(p => p.bowling.canBowl !== false);
