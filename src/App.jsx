@@ -20,8 +20,8 @@ function App() {
     setScreen('live');
     setIsSimulating(true);
 
-    const team1 = TEAMS[config.team1];
-    const team2 = TEAMS[config.team2];
+    const team1 = config.isDraft ? config.draftTeam1 : TEAMS[config.team1];
+    const team2 = config.isDraft ? config.draftTeam2 : TEAMS[config.team2];
 
     // Run simulation
     const result = simulateMatch({
