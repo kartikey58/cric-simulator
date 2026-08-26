@@ -4,6 +4,7 @@ import {
   getFatigueFactor, getFormatScoringMultiplier,
 } from './constants';
 import { STADIUMS } from './stadiums';
+import teamsStats from './teams_stats.json';
 
 // ─── BALL CONDITION ─────────────────────────────────────────────────────────
 // Tracks swing → seam → reverse swing → spin progression over ball age
@@ -657,16 +658,55 @@ export function simulateInnings({
 
   const ballCondition = new BallCondition();
   const powerplay = new PowerplayManager(format);
-  const bowlingCaptain = bowlingTeam.players[bowlingTeam.captainIndex];
+  const formatKey = format.toUpperCase();
+  
+  const mapPlayerStats = (player, teamName) => {
+    const statsOverride = teamsStats[teamName]?.[player.name]?.[formatKey];
+    const newBatting = { ...player.batting };
+    const newBowling = { ...player.bowling };
+
+    if (statsOverride) {
+      if (statsOverride.batting) {
+        if (statsOverride.batting.average !== undefined && statsOverride.batting.average !== null) {
+          newBatting.average = statsOverride.batting.average;
+        }
+        if (statsOverride.batting.strikeRate !== undefined && statsOverride.batting.strikeRate !== null) {
+          newBatting.strikeRate = statsOverride.batting.strikeRate;
+        }
+      }
+      if (statsOverride.bowling) {
+        if (statsOverride.bowling.average !== undefined && statsOverride.bowling.average !== null) {
+          newBowling.average = statsOverride.bowling.average;
+        }
+        if (statsOverride.bowling.economy !== undefined && statsOverride.bowling.economy !== null) {
+          newBowling.economy = statsOverride.bowling.economy;
+        }
+        if (statsOverride.bowling.strikeRate !== undefined && statsOverride.bowling.strikeRate !== null) {
+          newBowling.strikeRate = statsOverride.bowling.strikeRate;
+        }
+      }
+    }
+
+    return {
+      ...player,
+      batting: newBatting,
+      bowling: newBowling
+    };
+  };
+
+  const battingPlayersMapped = battingTeam.players.map(p => mapPlayerStats(p, battingTeam.name));
+  const bowlingPlayersMapped = bowlingTeam.players.map(p => mapPlayerStats(p, bowlingTeam.name));
+
+  const bowlingCaptain = bowlingPlayersMapped[bowlingTeam.captainIndex];
   const captainProfile = new CaptainshipProfile(bowlingCaptain);
 
   // ── Batting order ────────────────────────────────────────────────
-  const battingOrder = [...battingTeam.players];
+  const battingOrder = [...battingPlayersMapped];
   const roleOrder = { 'Batsman': 0, 'Wicket-Keeper': 1, 'All-Rounder': 2, 'Bowler': 3 };
   battingOrder.sort((a, b) => (roleOrder[a.role] || 3) - (roleOrder[b.role] || 3));
 
   // ── Bowling rotation ─────────────────────────────────────────────
-  const bowlers = bowlingTeam.players.filter(p => p.bowling.canBowl !== false);
+  const bowlers = bowlingPlayersMapped.filter(p => p.bowling.canBowl !== false);
   const bowlerOvers = {};
 
   // ── Scoreboard ───────────────────────────────────────────────────
