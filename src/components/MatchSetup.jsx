@@ -59,6 +59,8 @@ export default function MatchSetup({ onStartMatch }) {
   const [turnSpunCountry, setTurnSpunCountry] = useState(null); // Country spun for the current pick
   const [isSpinning, setIsSpinning] = useState(false);
   const [wheelRotation, setWheelRotation] = useState(0);
+  const [isWheelModalOpen, setIsWheelModalOpen] = useState(false);
+  const [spunResultObject, setSpunResultObject] = useState(null);
 
   const teamList = useMemo(() => getTeamList(), []);
   const stadiumsByCountry = useMemo(() => getStadiumsByCountry(), []);
@@ -198,10 +200,12 @@ export default function MatchSetup({ onStartMatch }) {
     }, 1800);
   };
 
-  // Turn-based Spin Wheel trigger
+  // Turn-based Spin Wheel trigger (opens Pop-Out Modal)
   const triggerSpin = () => {
     if (isSpinning) return;
     setIsSpinning(true);
+    setIsWheelModalOpen(true);
+    setSpunResultObject(null);
     setTurnSpunCountry(null);
 
     const targetIdx = Math.floor(Math.random() * 6);
@@ -211,8 +215,14 @@ export default function MatchSetup({ onStartMatch }) {
     setTimeout(() => {
       const countryObj = countries[targetIdx];
       const countryName = countryObj.fullName || countryObj.name;
+      setSpunResultObject(countryObj);
       setTurnSpunCountry(countryName);
       setIsSpinning(false);
+
+      // Auto close pop-out modal after 1.0s celebratory preview
+      setTimeout(() => {
+        setIsWheelModalOpen(false);
+      }, 1000);
     }, 2500);
   };
 
@@ -517,141 +527,79 @@ export default function MatchSetup({ onStartMatch }) {
                     </p>
                   </div>
 
-                  {/* Flow State A: Spin country wheel */}
+                  {/* Flow State A: Spin country wheel CTA */}
                   {!turnSpunCountry && (
-                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
-                      <div style={{ position: 'relative', width: '220px', height: '220px', marginBottom: 24, display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                        {/* Wheel Pointer */}
-                        <div style={{
-                          position: 'absolute',
-                          top: '-8px', left: 'calc(50% - 10px)',
-                          width: 0, height: 0,
-                          borderLeft: '10px solid transparent',
-                          borderRight: '10px solid transparent',
-                          borderTop: '18px solid var(--accent-red)',
-                          zIndex: 10,
-                          filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))'
-                        }} />
-                        {/* Wheel Graphic */}
-                        <div style={{
-                          width: '200px', height: '200px',
-                          borderRadius: '50%',
-                          border: '6px solid var(--border-medium)',
-                          boxShadow: '0 0 15px rgba(99, 102, 241, 0.25), inset 0 0 10px rgba(0,0,0,0.6)',
-                          background: 'conic-gradient(#1E90FF 0deg 60deg, #FFD700 60deg 120deg, #003366 120deg 180deg, #007A4D 180deg 240deg, #006600 240deg 300deg, #111111 300deg 360deg)',
-                          position: 'relative',
-                          overflow: 'hidden',
-                          transition: isSpinning ? 'transform 2.5s cubic-bezier(0.2, 0.8, 0.2, 1)' : 'none',
-                          transform: `rotate(${wheelRotation}deg)`,
-                        }}>
-                          {/* Sector Divider lines */}
-                          {countries.map((_, i) => (
-                            <div
-                              key={`line-${i}`}
-                              style={{
-                                position: 'absolute',
-                                top: 0, left: '99px',
-                                width: '2px', height: '100px',
-                                background: 'rgba(255, 255, 255, 0.25)',
-                                transform: `rotate(${i * 60}deg)`,
-                                transformOrigin: '1px 100px',
-                                zIndex: 2,
-                              }}
-                            />
-                          ))}
-                          {/* Labels */}
-                          {countries.map((c, i) => (
-                            <div
-                              key={i}
-                              style={{
-                                position: 'absolute',
-                                top: 0, left: 0,
-                                width: '100%', height: '100%',
-                                transform: `rotate(${i * 60 + 90}deg)`, // Fixed rotation offset
-                                transformOrigin: '50% 50%',
-                                display: 'flex',
-                                justifyContent: 'center',
-                                fontSize: '0.68rem',
-                                fontWeight: 800,
-                                color: '#fff',
-                                textShadow: '0 1px 2px rgba(0,0,0,0.85)',
-                                zIndex: 3
-                              }}
-                            >
-                              <span style={{ paddingTop: 12 }}>{c.emoji}</span>
-                            </div>
-                          ))}
-                          {/* Center peg */}
-                          <div style={{
-                            position: 'absolute',
-                            top: '80px', left: '80px',
-                            width: '40px', height: '40px',
-                            borderRadius: '50%',
-                            background: 'radial-gradient(circle, #ffe066 0%, #ca8a04 100%)',
-                            border: '3px solid #ffffff',
-                            boxShadow: '0 2px 5px rgba(0,0,0,0.5)',
-                            zIndex: 5,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: '0.8rem'
-                          }}>
-                            🏏
-                          </div>
-                        </div>
-                      </div>
+                    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', width: '100%', padding: '30px 20px', textAlign: 'center' }}>
+                      <div style={{ fontSize: '3.5rem', marginBottom: 16 }} className="animate-bounce">🎰</div>
+                      <h4 style={{ fontSize: '1.25rem', fontWeight: 800, marginBottom: 8, color: 'var(--text-primary)' }}>
+                        Ready to Spin for {turnDetails.slotLabel}?
+                      </h4>
+                      <p style={{ color: 'var(--text-tertiary)', fontSize: '0.85rem', marginBottom: 28, maxWidth: '340px', lineHeight: 1.5 }}>
+                        Click below to pop out the wheel and spin for a random country!
+                      </p>
                       <button
                         className="btn btn-primary"
-                        style={{ padding: '12px 36px', borderRadius: '25px', fontWeight: 700, fontSize: '0.9rem' }}
+                        style={{
+                          padding: '16px 44px',
+                          borderRadius: '30px',
+                          fontWeight: 800,
+                          fontSize: '1rem',
+                          boxShadow: '0 10px 25px rgba(99, 102, 241, 0.4)',
+                          letterSpacing: '0.5px'
+                        }}
                         onClick={triggerSpin}
                         disabled={isSpinning}
                       >
-                        {isSpinning ? '🌀 Spinning...' : '🎡 Spin Country Wheel'}
+                        🎰 SPIN COUNTRY WHEEL
                       </button>
                     </div>
                   )}
 
-                  {/* Flow State B: Country Spun, select player */}
+                  {/* Flow State B: Country Spun, spacious player selection */}
                   {turnSpunCountry && (
                     <div style={{ flex: 1, width: '100%', display: 'flex', flexDirection: 'column' }} className="animate-scale-in">
                       <div style={{ 
                         display: 'flex', 
                         alignItems: 'center', 
-                        justifyContent: 'center', 
-                        gap: 8, 
-                        background: 'var(--bg-secondary)', 
-                        padding: '10px 16px', 
-                        borderRadius: '8px', 
-                        border: '1px solid var(--border-subtle)',
-                        marginBottom: 16
+                        justifyContent: 'space-between', 
+                        background: 'rgba(99, 102, 241, 0.08)', 
+                        padding: '12px 20px', 
+                        borderRadius: '10px', 
+                        border: '1px solid var(--accent-primary-light)',
+                        marginBottom: 20
                       }}>
-                        <span style={{ fontSize: '1.5rem' }}>
-                          {countries.find(c => c.name === turnSpunCountry)?.emoji}
-                        </span>
-                        <span style={{ fontWeight: 800, fontSize: '0.92rem' }}>
-                          Country Spun: {turnSpunCountry}
-                        </span>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                          <span style={{ fontSize: '1.8rem' }}>
+                            {countries.find(c => c.name === turnSpunCountry)?.emoji}
+                          </span>
+                          <div>
+                            <div style={{ fontSize: '0.68rem', textTransform: 'uppercase', color: 'var(--text-tertiary)', fontWeight: 700 }}>Result</div>
+                            <div style={{ fontWeight: 800, fontSize: '1.1rem', color: 'var(--text-primary)' }}>
+                              {turnSpunCountry}
+                            </div>
+                          </div>
+                        </div>
                         <button 
-                          className="btn-ghost" 
-                          style={{ padding: '0 4px', fontSize: '0.68rem', color: 'var(--accent-red)', cursor: 'pointer', background: 'none', border: 'none', marginLeft: 'auto', fontWeight: 600 }}
+                          className="btn btn-secondary btn-sm" 
+                          style={{ padding: '6px 14px', fontSize: '0.78rem', fontWeight: 700, borderRadius: '8px' }}
                           onClick={triggerSpin}
                         >
-                          Respin 🔄
+                          🔄 Respin Wheel
                         </button>
                       </div>
 
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginBottom: 12, fontWeight: 600 }}>
-                        Select a player from {turnSpunCountry} for <span style={{ color: 'var(--accent-cyan)' }}>{turnDetails.slotLabel}</span>:
+                      <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary)', marginBottom: 14, fontWeight: 700 }}>
+                        Available Players for <span style={{ color: 'var(--accent-cyan)' }}>{turnDetails.slotLabel}</span>:
                       </div>
 
-                      {/* Player Grid Cards */}
+                      {/* Spacious Player Cards Grid */}
                       <div style={{ 
                         flex: 1, 
                         overflowY: 'auto', 
-                        maxHeight: '280px', 
+                        maxHeight: '340px', 
                         display: 'grid', 
-                        gridTemplateColumns: '1fr 1fr', 
-                        gap: 10, 
+                        gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', 
+                        gap: 12, 
                         paddingRight: 4 
                       }}>
                         {getAvailablePlayers(turnDetails.category, turnSpunCountry).length > 0 ? (
@@ -663,8 +611,8 @@ export default function MatchSetup({ onStartMatch }) {
                                 display: 'flex', 
                                 flexDirection: 'column', 
                                 alignItems: 'flex-start',
-                                padding: '12px 14px', 
-                                borderRadius: '8px', 
+                                padding: '14px 16px', 
+                                borderRadius: '10px', 
                                 border: '1.5px solid var(--border-subtle)',
                                 background: 'var(--bg-secondary)',
                                 cursor: 'pointer',
@@ -674,8 +622,8 @@ export default function MatchSetup({ onStartMatch }) {
                               onMouseEnter={(e) => {
                                 e.currentTarget.style.borderColor = 'var(--accent-primary)';
                                 e.currentTarget.style.background = 'rgba(99, 102, 241, 0.05)';
-                                e.currentTarget.style.transform = 'translateY(-2px)';
-                                e.currentTarget.style.boxShadow = '0 4px 12px rgba(99, 102, 241, 0.15)';
+                                e.currentTarget.style.transform = 'translateY(-3px)';
+                                e.currentTarget.style.boxShadow = '0 6px 16px rgba(99, 102, 241, 0.2)';
                               }}
                               onMouseLeave={(e) => {
                                 e.currentTarget.style.borderColor = 'var(--border-subtle)';
@@ -684,28 +632,28 @@ export default function MatchSetup({ onStartMatch }) {
                                 e.currentTarget.style.boxShadow = 'none';
                               }}
                             >
-                              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center' }}>
-                                <strong style={{ fontSize: '0.85rem', color: 'var(--text-primary)' }}>{p.name}</strong>
-                                <span style={{ fontSize: '0.7rem', fontWeight: 800, color: 'var(--accent-amber)', background: 'rgba(245, 158, 11, 0.15)', padding: '1px 5px', borderRadius: '4px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginBottom: 4 }}>
+                                <strong style={{ fontSize: '0.88rem', color: 'var(--text-primary)' }}>{p.name}</strong>
+                                <span style={{ fontSize: '0.72rem', fontWeight: 800, color: 'var(--accent-amber)', background: 'rgba(245, 158, 11, 0.15)', padding: '2px 6px', borderRadius: '4px' }}>
                                   ★{p.batting.average || p.bowling.average}
                                 </span>
                               </div>
-                              <span style={{ fontSize: '0.68rem', color: 'var(--text-tertiary)', marginTop: 4 }}>
+                              <span style={{ fontSize: '0.72rem', color: 'var(--text-tertiary)' }}>
                                 {p.role} • {p.bowling.type.replace(/_/g, ' ')}
                               </span>
                             </div>
                           ))
                         ) : (
-                          <div style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '24px 0', border: '1px dashed var(--accent-red)', borderRadius: '8px' }}>
-                            <div style={{ fontSize: '0.78rem', color: 'var(--accent-red)', marginBottom: 8, fontWeight: 600 }}>
+                          <div style={{ gridColumn: 'span 2', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 0', border: '1px dashed var(--accent-red)', borderRadius: '10px' }}>
+                            <div style={{ fontSize: '0.85rem', color: 'var(--accent-red)', marginBottom: 12, fontWeight: 700 }}>
                               No players left from {turnSpunCountry} for this duty!
                             </div>
                             <button 
                               className="btn btn-secondary btn-sm" 
-                              style={{ fontWeight: 700 }}
+                              style={{ fontWeight: 700, padding: '8px 20px' }}
                               onClick={triggerSpin}
                             >
-                              🔄 Spin Again
+                              🔄 Respin Wheel
                             </button>
                           </div>
                         )}
@@ -899,6 +847,163 @@ export default function MatchSetup({ onStartMatch }) {
           </div>
         )}
       </div>
+      {/* POP-OUT WHEEL MODAL */}
+      {isWheelModalOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(5, 7, 15, 0.82)',
+          backdropFilter: 'blur(10px)',
+          zIndex: 1000,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px'
+        }} className="animate-fade-in">
+          <div className="card animate-scale-in" style={{
+            width: '420px',
+            maxWidth: '92vw',
+            background: 'var(--bg-secondary)',
+            border: '1.5px solid var(--border-medium)',
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(99, 102, 241, 0.3)',
+            borderRadius: '20px',
+            padding: '28px 24px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            position: 'relative'
+          }}>
+            <h3 style={{ marginBottom: 6, fontSize: '1.25rem', fontWeight: 800 }}>🎯 Country Selection Spin</h3>
+            <p style={{ color: 'var(--text-tertiary)', fontSize: '0.82rem', marginBottom: 20, textAlign: 'center' }}>
+              Spinning for <strong style={{ color: 'var(--text-primary)' }}>{turnDetails?.teamName}</strong> — Duty: <strong style={{ color: 'var(--accent-cyan)' }}>{turnDetails?.slotLabel}</strong>
+            </p>
+
+            {/* Wheel Graphic Box */}
+            <div style={{ position: 'relative', margin: '16px 0', width: '310px', height: '310px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              {/* Top Pointer */}
+              <div style={{
+                position: 'absolute',
+                top: '-5px',
+                left: 'calc(50% - 15px)',
+                width: 0, height: 0,
+                borderLeft: '15px solid transparent',
+                borderRight: '15px solid transparent',
+                borderTop: '25px solid var(--accent-red)',
+                zIndex: 10,
+                filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.5))'
+              }} />
+
+              {/* The Wheel */}
+              <div style={{
+                width: '290px',
+                height: '290px',
+                borderRadius: '50%',
+                border: '8px solid var(--border-medium)',
+                boxShadow: '0 0 25px rgba(99, 102, 241, 0.35), inset 0 0 15px rgba(0,0,0,0.6)',
+                background: 'conic-gradient(#1E90FF 0deg 60deg, #FFD700 60deg 120deg, #003366 120deg 180deg, #007A4D 180deg 240deg, #006600 240deg 300deg, #111111 300deg 360deg)',
+                position: 'relative',
+                overflow: 'hidden',
+                transition: isSpinning ? 'transform 2.5s cubic-bezier(0.2, 0.8, 0.2, 1)' : 'none',
+                transform: `rotate(${wheelRotation}deg)`,
+              }}>
+                {/* Sector Dividers */}
+                {countries.map((_, i) => (
+                  <div
+                    key={`line-${i}`}
+                    style={{
+                      position: 'absolute',
+                      top: 0, left: '144px',
+                      width: '2px', height: '145px',
+                      background: 'rgba(255, 255, 255, 0.25)',
+                      transform: `rotate(${i * 60}deg)`,
+                      transformOrigin: '1px 145px',
+                      zIndex: 2,
+                    }}
+                  />
+                ))}
+
+                {/* Sector Labels */}
+                {countries.map((c, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      position: 'absolute',
+                      top: 0, left: 0,
+                      width: '100%', height: '100%',
+                      transform: `rotate(${i * 60 + 90}deg)`,
+                      transformOrigin: '50% 50%',
+                      display: 'flex',
+                      justifyContent: 'center',
+                      zIndex: 3
+                    }}
+                  >
+                    <div style={{
+                      paddingTop: '22px',
+                      color: '#ffffff',
+                      fontSize: '0.78rem',
+                      fontWeight: 800,
+                      textShadow: '0 2px 4px rgba(0,0,0,0.85), 0 0 2px rgba(0,0,0,0.85)',
+                      textAlign: 'center',
+                    }}>
+                      <div style={{ fontSize: '1.25rem', marginBottom: 2 }}>{c.emoji}</div>
+                      <div>{c.name}</div>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Casino glowing lights on outer rim */}
+                {Array.from({ length: 12 }).map((_, idx) => (
+                  <div
+                    key={`bulb-${idx}`}
+                    style={{
+                      position: 'absolute',
+                      top: '4px', left: '139px',
+                      width: '12px', height: '12px',
+                      borderRadius: '50%',
+                      background: '#ffffff',
+                      boxShadow: '0 0 8px #ffffff, 0 0 15px #ffe066',
+                      transform: `rotate(${idx * 30}deg)`,
+                      transformOrigin: '6px 141px',
+                      zIndex: 4,
+                    }}
+                  />
+                ))}
+
+                {/* Inner Center Circle Peg */}
+                <div style={{
+                  position: 'absolute',
+                  top: '115px', left: '115px',
+                  width: '60px', height: '60px',
+                  borderRadius: '50%',
+                  background: 'radial-gradient(circle, #ffe066 0%, #ca8a04 100%)',
+                  border: '4px solid #ffffff',
+                  boxShadow: '0 4px 10px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.6)',
+                  zIndex: 5,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '1.1rem',
+                }}>
+                  🏏
+                </div>
+              </div>
+            </div>
+
+            {/* Result announcement */}
+            <div style={{ marginTop: 12, height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {spunResultObject ? (
+                <div className="animate-scale-in" style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--accent-green)' }}>
+                  🎉 {spunResultObject.emoji} {spunResultObject.name}!
+                </div>
+              ) : (
+                <span style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', fontWeight: 600 }}>
+                  🌀 Wheel Spinning...
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
