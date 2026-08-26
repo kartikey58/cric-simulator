@@ -27,6 +27,15 @@ const DRAFT_SLOTS = [
   { id: 10, label: 'Bowler 3', category: 'bowler' },
 ];
 
+const countries = [
+  { name: 'India', emoji: '🇮🇳', color: '#1E90FF' },
+  { name: 'Australia', emoji: '🇦🇺', color: '#FFD700' },
+  { name: 'England', emoji: '🏴&apos; England', color: '#003366', fullName: 'England' }, // Custom name mapping
+  { name: 'South Africa', emoji: '🇿🇦', color: '#007A4D' },
+  { name: 'Pakistan', emoji: '🇵🇰', color: '#006600' },
+  { name: 'New Zealand', emoji: '🇳🇿', color: '#111111' },
+];
+
 export default function MatchSetup({ onStartMatch }) {
   const [mode, setMode] = useState('preset'); // 'preset' | 'draft'
   const [team1, setTeam1] = useState('India');
@@ -39,6 +48,13 @@ export default function MatchSetup({ onStartMatch }) {
   const [draftTeam2Name, setDraftTeam2Name] = useState('Team Beta');
   const [draftTeam1Players, setDraftTeam1Players] = useState(Array(11).fill(null));
   const [draftTeam2Players, setDraftTeam2Players] = useState(Array(11).fill(null));
+
+  // Spin the wheel states
+  const [spinningSlot, setSpinningSlot] = useState(null); // { team: 'team1'|'team2', slotId: number }
+  const [spunCountries, setSpunCountries] = useState({ team1: {}, team2: {} });
+  const [isSpinning, setIsSpinning] = useState(false);
+  const [wheelRotation, setWheelRotation] = useState(0);
+  const [selectedCountryResult, setSelectedCountryResult] = useState(null);
 
   const teamList = useMemo(() => getTeamList(), []);
   const stadiumsByCountry = useMemo(() => getStadiumsByCountry(), []);
@@ -78,9 +94,10 @@ export default function MatchSetup({ onStartMatch }) {
     ];
   }, [draftTeam1Players, draftTeam2Players]);
 
-  const getAvailablePlayers = (category, currentSelectedName) => {
+  const getAvailablePlayers = (category, country, currentSelectedName) => {
     return playerPool.filter(p =>
       p.category === category &&
+      p.teamName === country &&
       (!draftedNames.includes(p.name) || p.name === currentSelectedName)
     );
   };
@@ -142,6 +159,51 @@ export default function MatchSetup({ onStartMatch }) {
         stadium
       });
     }
+  };
+
+  const triggerSpin = () => {
+    if (isSpinning) return;
+    setIsSpinning(true);
+    setSelectedCountryResult(null);
+
+    // Pick random country index
+    const targetIdx = Math.floor(Math.random() * 6);
+    // Align sector to pointer (0 degrees pointing down or top)
+    // Sector center is i * 60 + 30 degrees. To align top, we rotate 360 - (i * 60 + 30)
+    const rotation = 1800 + (360 - (targetIdx * 60 + 30));
+    setWheelRotation(rotation);
+
+    setTimeout(() => {
+      const countryObj = countries[targetIdx];
+      const countryName = countryObj.fullName || countryObj.name;
+      setSelectedCountryResult(countryObj);
+
+      // Save country for that slot
+      const updated = { ...spunCountries };
+      if (!updated[spinningSlot.team]) updated[spinningSlot.team] = {};
+      updated[spinningSlot.team][spinningSlot.slotId] = countryName;
+      setSpunCountries(updated);
+
+      // Clean up player slot if it was already selected but from a different country
+      const currentSlotPlayer = spinningSlot.team === 'team1' 
+        ? draftTeam1Players[spinningSlot.slotId] 
+        : draftTeam2Players[spinningSlot.slotId];
+        
+      if (currentSlotPlayer && currentSlotPlayer.teamName !== countryName) {
+        const updatedPlayers = spinningSlot.team === 'team1' ? [...draftTeam1Players] : [...draftTeam2Players];
+        updatedPlayers[spinningSlot.slotId] = null;
+        if (spinningSlot.team === 'team1') setDraftTeam1Players(updatedPlayers);
+        else setDraftTeam2Players(updatedPlayers);
+      }
+
+      setIsSpinning(false);
+      // Wait a moment so player sees the final result before modal closes
+      setTimeout(() => {
+        setSpinningSlot(null);
+        setWheelRotation(0);
+        setSelectedCountryResult(null);
+      }, 1500);
+    }, 2500);
   };
 
   return (
@@ -285,30 +347,62 @@ export default function MatchSetup({ onStartMatch }) {
                 const p1 = draftTeam1Players[slot.id];
                 const p2 = draftTeam2Players[slot.id];
 
-                const pool1 = getAvailablePlayers(slot.category, p1?.name);
-                const pool2 = getAvailablePlayers(slot.category, p2?.name);
+                const country1 = spunCountries.team1[slot.id];
+                const country2 = spunCountries.team2[slot.id];
+
+                const pool1 = country1 ? getAvailablePlayers(slot.category, country1, p1?.name) : [];
+                const pool2 = country2 ? getAvailablePlayers(slot.category, country2, p2?.name) : [];
 
                 return (
                   <div key={slot.id} style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1.2fr', gap: 16, alignItems: 'center' }}>
                     {/* Team A Picker */}
-                    <select
-                      className="select-field"
-                      style={{ fontSize: '0.82rem', padding: '8px 12px', height: '38px', backgroundPosition: 'right 8px center' }}
-                      value={p1 ? p1.name : ''}
-                      onChange={(e) => {
-                        const selected = pool1.find(p => p.name === e.target.value);
-                        const updated = [...draftTeam1Players];
-                        updated[slot.id] = selected || null;
-                        setDraftTeam1Players(updated);
-                      }}
-                    >
-                      <option value="">— Select {slot.label} —</option>
-                      {pool1.map(p => (
-                        <option key={p.name} value={p.name}>
-                          {p.teamEmoji} {p.name} ({p.teamName})
-                        </option>
-                      ))}
-                    </select>
+                    {country1 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem' }}>
+                          <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Country: {countries.find(c => (c.fullName || c.name) === country1)?.emoji} {country1}</span>
+                          <button 
+                            className="btn-ghost" 
+                            style={{ padding: '0 4px', fontSize: '0.65rem', color: 'var(--accent-red)', cursor: 'pointer', background: 'none', border: 'none' }}
+                            onClick={() => setSpinningSlot({ team: 'team1', slotId: slot.id })}
+                            title="Respin Country"
+                          >
+                            🔄 Respin
+                          </button>
+                        </div>
+                        {pool1.length > 0 ? (
+                          <select
+                            className="select-field"
+                            style={{ fontSize: '0.82rem', padding: '8px 12px', height: '38px', backgroundPosition: 'right 8px center' }}
+                            value={p1 ? p1.name : ''}
+                            onChange={(e) => {
+                              const selected = pool1.find(p => p.name === e.target.value);
+                              const updated = [...draftTeam1Players];
+                              updated[slot.id] = selected || null;
+                              setDraftTeam1Players(updated);
+                            }}
+                          >
+                            <option value="">— Select {slot.label} —</option>
+                            {pool1.map(p => (
+                              <option key={p.name} value={p.name}>
+                                {p.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div style={{ fontSize: '0.72rem', color: 'var(--accent-red)', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px dashed var(--accent-red)', borderRadius: 'var(--radius-sm)' }}>
+                            No players left! Respin 🔄
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        style={{ height: '38px', width: '100%', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600 }}
+                        onClick={() => setSpinningSlot({ team: 'team1', slotId: slot.id })}
+                      >
+                        🎯 Spin Country
+                      </button>
+                    )}
 
                     {/* Duty Label */}
                     <div style={{ 
@@ -329,24 +423,53 @@ export default function MatchSetup({ onStartMatch }) {
                     </div>
 
                     {/* Team B Picker */}
-                    <select
-                      className="select-field"
-                      style={{ fontSize: '0.82rem', padding: '8px 12px', height: '38px', backgroundPosition: 'right 8px center' }}
-                      value={p2 ? p2.name : ''}
-                      onChange={(e) => {
-                        const selected = pool2.find(p => p.name === e.target.value);
-                        const updated = [...draftTeam2Players];
-                        updated[slot.id] = selected || null;
-                        setDraftTeam2Players(updated);
-                      }}
-                    >
-                      <option value="">— Select {slot.label} —</option>
-                      {pool2.map(p => (
-                        <option key={p.name} value={p.name}>
-                          {p.teamEmoji} {p.name} ({p.teamName})
-                        </option>
-                      ))}
-                    </select>
+                    {country2 ? (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.68rem' }}>
+                          <span style={{ color: 'var(--text-secondary)', fontWeight: 600 }}>Country: {countries.find(c => (c.fullName || c.name) === country2)?.emoji} {country2}</span>
+                          <button 
+                            className="btn-ghost" 
+                            style={{ padding: '0 4px', fontSize: '0.65rem', color: 'var(--accent-red)', cursor: 'pointer', background: 'none', border: 'none' }}
+                            onClick={() => setSpinningSlot({ team: 'team2', slotId: slot.id })}
+                            title="Respin Country"
+                          >
+                            🔄 Respin
+                          </button>
+                        </div>
+                        {pool2.length > 0 ? (
+                          <select
+                            className="select-field"
+                            style={{ fontSize: '0.82rem', padding: '8px 12px', height: '38px', backgroundPosition: 'right 8px center' }}
+                            value={p2 ? p2.name : ''}
+                            onChange={(e) => {
+                              const selected = pool2.find(p => p.name === e.target.value);
+                              const updated = [...draftTeam2Players];
+                              updated[slot.id] = selected || null;
+                              setDraftTeam2Players(updated);
+                            }}
+                          >
+                            <option value="">— Select {slot.label} —</option>
+                            {pool2.map(p => (
+                              <option key={p.name} value={p.name}>
+                                {p.name}
+                              </option>
+                            ))}
+                          </select>
+                        ) : (
+                          <div style={{ fontSize: '0.72rem', color: 'var(--accent-red)', height: '38px', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px dashed var(--accent-red)', borderRadius: 'var(--radius-sm)' }}>
+                            No players left! Respin 🔄
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      <button
+                        className="btn btn-secondary btn-sm"
+                        style={{ height: '38px', width: '100%', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 600 }}
+                        onClick={() => setSpinningSlot({ team: 'team2', slotId: slot.id })}
+                      >
+                        🎯 Spin Country
+                      </button>
+                    )}
                   </div>
                 );
               })}
@@ -427,11 +550,132 @@ export default function MatchSetup({ onStartMatch }) {
             <p style={{ color: 'var(--text-tertiary)', fontSize: '0.82rem', marginTop: 12 }}>
               {mode === 'preset' 
                 ? 'Please select two different teams, a format, and a stadium' 
-                : 'Please select all 11 players for both teams, a format, and a stadium'}
+                : 'Please spin and select all 11 players for both teams, a format, and a stadium'}
             </p>
           )}
         </div>
       </div>
+
+      {/* ─── SPIN THE WHEEL MODAL ──────────────────────────────────────────────── */}
+      {spinningSlot && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          background: 'rgba(5, 5, 10, 0.88)',
+          backdropFilter: 'blur(8px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+        }}>
+          <div className="card" style={{
+            width: '420px',
+            padding: '32px',
+            textAlign: 'center',
+            border: '1px solid var(--border-medium)',
+            background: 'var(--glass-bg)',
+            boxShadow: 'var(--shadow-lg)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            position: 'relative'
+          }}>
+            <h3 style={{ marginBottom: 8, fontSize: '1.1rem' }}>🎯 Country Selection Spin</h3>
+            <p style={{ color: 'var(--text-tertiary)', fontSize: '0.78rem', marginBottom: 24 }}>
+              Spinning for <strong>{spinningSlot.team === 'team1' ? draftTeam1Name : draftTeam2Name}</strong> — Duty: <strong>{DRAFT_SLOTS[spinningSlot.slotId].label}</strong>
+            </p>
+
+            {/* Spinner Board Container */}
+            <div style={{ position: 'relative', margin: '20px 0', width: '310px', height: '310px', display: 'flex', justifyContent: 'center' }}>
+              {/* Top Pointer */}
+              <div style={{
+                position: 'absolute',
+                top: '-15px',
+                width: 0, height: 0,
+                borderLeft: '15px solid transparent',
+                borderRight: '15px solid transparent',
+                borderTop: '25px solid var(--accent-red)',
+                zIndex: 10,
+                filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))'
+              }} />
+
+              {/* The Wheel */}
+              <div style={{
+                width: '300px',
+                height: '300px',
+                borderRadius: '50%',
+                border: '6px solid var(--border-medium)',
+                boxShadow: '0 0 20px rgba(99, 102, 241, 0.25), inset 0 0 10px rgba(0,0,0,0.5)',
+                background: 'conic-gradient(#1E90FF 0deg 60deg, #FFD700 60deg 120deg, #003366 120deg 180deg, #007A4D 180deg 240deg, #006600 240deg 300deg, #111111 300deg 360deg)',
+                position: 'relative',
+                overflow: 'hidden',
+                transition: isSpinning ? 'transform 2.5s cubic-bezier(0.2, 0.8, 0.2, 1)' : 'none',
+                transform: `rotate(${wheelRotation}deg)`,
+              }}>
+                {/* Sector Labels */}
+                {countries.map((c, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      position: 'absolute',
+                      top: 0, left: 0,
+                      width: '100%', height: '100%',
+                      transform: `rotate(${i * 60}deg)`,
+                      transformOrigin: '50% 50%',
+                      display: 'flex',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <div style={{
+                      transform: 'rotate(30deg)',
+                      transformOrigin: '50% 0px',
+                      paddingTop: '24px',
+                      color: '#ffffff',
+                      fontSize: '0.78rem',
+                      fontWeight: 700,
+                      textShadow: '0 2px 4px rgba(0,0,0,0.85), 0 0 2px rgba(0,0,0,0.85)',
+                      textAlign: 'center',
+                    }}>
+                      <div style={{ fontSize: '1.2rem', marginBottom: 2 }}>{c.emoji}</div>
+                      <div>{c.name}</div>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Inner Center Circle peg */}
+                <div style={{
+                  position: 'absolute',
+                  top: '125px', left: '125px',
+                  width: '50px', height: '50px',
+                  borderRadius: '50%',
+                  background: 'var(--bg-primary)',
+                  border: '4px solid var(--border-medium)',
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.5)',
+                  zIndex: 5
+                }} />
+              </div>
+            </div>
+
+            {/* Spin / Status Panel */}
+            <div style={{ marginTop: 12, height: '60px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+              {selectedCountryResult ? (
+                <div className="animate-scale-in" style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--accent-green)' }}>
+                  🎉 {selectedCountryResult.emoji} {selectedCountryResult.fullName || selectedCountryResult.name}!
+                </div>
+              ) : (
+                <button
+                  className="btn btn-primary"
+                  style={{ padding: '12px 32px', fontSize: '0.9rem', fontWeight: 600, borderRadius: '20px' }}
+                  onClick={triggerSpin}
+                  disabled={isSpinning}
+                >
+                  {isSpinning ? '🌀 Spinning...' : '🎰 Spin the Wheel'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
