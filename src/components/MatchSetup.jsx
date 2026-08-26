@@ -28,12 +28,12 @@ const DRAFT_SLOTS = [
 ];
 
 const countries = [
-  { name: 'India', emoji: '🇮🇳', color: '#1E90FF' },
-  { name: 'Australia', emoji: '🇦🇺', color: '#FFD700' },
-  { name: 'England', emoji: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', color: '#003366' },
-  { name: 'South Africa', emoji: '🇿🇦', color: '#007A4D' },
-  { name: 'Pakistan', emoji: '🇵🇰', color: '#006600' },
-  { name: 'New Zealand', emoji: '🇳🇿', color: '#111111' },
+  { name: 'Joker', code: 'JO', emoji: '👑', color: '#311B92' },
+  { name: 'South Africa', code: 'SA', emoji: '🇿🇦', color: '#111111' },
+  { name: 'Australia', code: 'AU', emoji: '🇦🇺', color: '#FBC02D' },
+  { name: 'India', code: 'IN', emoji: '🇮🇳', color: '#1E88E5' },
+  { name: 'New Zealand', code: 'NZ', emoji: '🇳🇿', color: '#009688' },
+  { name: 'Pakistan', code: 'PK', emoji: '🇵🇰', color: '#4CAF50' },
 ];
 
 export default function MatchSetup({ onStartMatch }) {
@@ -119,7 +119,7 @@ export default function MatchSetup({ onStartMatch }) {
   const getAvailablePlayers = (category, country) => {
     return playerPool.filter(p =>
       p.category === category &&
-      p.teamName === country &&
+      (country === 'Joker' ? true : p.teamName === country) &&
       !draftedNames.includes(p.name)
     );
   };
@@ -210,7 +210,8 @@ export default function MatchSetup({ onStartMatch }) {
     setWheelRotation(0); // Snap back to 0deg instantly
 
     const targetIdx = Math.floor(Math.random() * 6);
-    const rotation = 1800 + (360 - (targetIdx * 60 + 30));
+    // 45deg pointer offset calculation: rotation = 1800 + (45deg pointer - target sector center)
+    const rotation = 1800 + (45 - (targetIdx * 60 + 30));
 
     // Delay target rotation to let the Modal mount at 0deg first
     setTimeout(() => {
@@ -858,7 +859,7 @@ export default function MatchSetup({ onStartMatch }) {
         <div style={{
           position: 'fixed',
           top: 0, left: 0, right: 0, bottom: 0,
-          background: 'rgba(5, 7, 15, 0.82)',
+          background: 'rgba(5, 7, 15, 0.85)',
           backdropFilter: 'blur(10px)',
           zIndex: 1000,
           display: 'flex',
@@ -869,34 +870,67 @@ export default function MatchSetup({ onStartMatch }) {
           <div className="card animate-scale-in" style={{
             width: '420px',
             maxWidth: '92vw',
-            background: 'var(--bg-secondary)',
-            border: '1.5px solid var(--border-medium)',
-            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(99, 102, 241, 0.3)',
-            borderRadius: '20px',
-            padding: '28px 24px',
+            background: '#1e293b',
+            border: '2px solid #475569',
+            boxShadow: '0 20px 50px rgba(0, 0, 0, 0.8), 0 0 30px rgba(99, 102, 241, 0.2)',
+            borderRadius: '24px',
+            padding: '32px 24px',
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
             position: 'relative'
           }}>
-            <h3 style={{ marginBottom: 6, fontSize: '1.25rem', fontWeight: 800 }}>🎯 Country Selection Spin</h3>
-            <p style={{ color: 'var(--text-tertiary)', fontSize: '0.82rem', marginBottom: 20, textAlign: 'center' }}>
-              Spinning for <strong style={{ color: 'var(--text-primary)' }}>{turnDetails?.teamName}</strong> — Duty: <strong style={{ color: 'var(--accent-cyan)' }}>{turnDetails?.slotLabel}</strong>
+            <h3 style={{ marginBottom: 6, fontSize: '1.25rem', fontWeight: 800, color: '#f8fafc' }}>🎯 Country Selection Spin</h3>
+            <p style={{ color: '#94a3b8', fontSize: '0.82rem', marginBottom: 20, textAlign: 'center' }}>
+              Spinning for <strong style={{ color: '#f1f5f9' }}>{turnDetails?.teamName}</strong> — Duty: <strong style={{ color: '#22d3ee' }}>{turnDetails?.slotLabel}</strong>
             </p>
 
             {/* Wheel Graphic Box */}
-            <div style={{ position: 'relative', margin: '16px 0', width: '310px', height: '310px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-              {/* Top Pointer */}
+            <div style={{ position: 'relative', margin: '20px 0', width: '320px', height: '320px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+              
+              {/* Outer Metallic Rim with 6 Screws/Rivets */}
               <div style={{
                 position: 'absolute',
-                top: '-5px',
-                left: 'calc(50% - 15px)',
+                top: '5px', left: '5px',
+                width: '310px', height: '310px',
+                borderRadius: '50%',
+                border: '10px solid #94a3b8',
+                background: 'transparent',
+                boxShadow: '0 8px 24px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.4)',
+                pointerEvents: 'none',
+                zIndex: 6,
+              }}>
+                {[0, 60, 120, 180, 240, 300].map(angle => (
+                  <div
+                    key={angle}
+                    style={{
+                      position: 'absolute',
+                      top: '2px', left: '140px',
+                      width: '10px', height: '10px',
+                      borderRadius: '50%',
+                      background: '#475569',
+                      border: '2px solid #cbd5e1',
+                      boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.8)',
+                      transform: `rotate(${angle}deg)`,
+                      transformOrigin: '5px 145px',
+                    }}
+                  />
+                ))}
+              </div>
+
+              {/* Top-Right Red Pointer (at 45deg pointing inwards) */}
+              <div style={{
+                position: 'absolute',
+                top: '12px',
+                right: '12px',
                 width: 0, height: 0,
-                borderLeft: '15px solid transparent',
-                borderRight: '15px solid transparent',
-                borderTop: '25px solid var(--accent-red)',
+                borderLeft: '14px solid transparent',
+                borderRight: '14px solid transparent',
+                borderTop: '28px solid #ef4444',
                 zIndex: 10,
-                filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.5))'
+                transform: 'rotate(-45deg)',
+                transformOrigin: '50% 0%',
+                filter: 'drop-shadow(-2px 4px 4px rgba(0,0,0,0.5))'
               }} />
 
               {/* The Wheel */}
@@ -904,13 +938,13 @@ export default function MatchSetup({ onStartMatch }) {
                 width: '290px',
                 height: '290px',
                 borderRadius: '50%',
-                border: '8px solid var(--border-medium)',
-                boxShadow: '0 0 25px rgba(99, 102, 241, 0.35), inset 0 0 15px rgba(0,0,0,0.6)',
-                background: 'conic-gradient(#1E90FF 0deg 60deg, #FFD700 60deg 120deg, #003366 120deg 180deg, #007A4D 180deg 240deg, #006600 240deg 300deg, #111111 300deg 360deg)',
+                background: 'conic-gradient(#311B92 0deg 60deg, #111111 60deg 120deg, #FBC02D 120deg 180deg, #1E88E5 180deg 240deg, #009688 240deg 300deg, #4CAF50 300deg 360deg)',
                 position: 'relative',
                 overflow: 'hidden',
-                transition: isSpinning ? 'transform 2.5s cubic-bezier(0.2, 0.8, 0.2, 1)' : 'none',
+                boxShadow: 'inset 0 0 20px rgba(0,0,0,0.7)',
+                transition: isSpinning ? 'transform 2.5s cubic-bezier(0.15, 0.85, 0.15, 1)' : 'none',
                 transform: `rotate(${wheelRotation}deg)`,
+                zIndex: 2,
               }}>
                 {/* Sector Dividers */}
                 {countries.map((_, i) => (
@@ -928,7 +962,7 @@ export default function MatchSetup({ onStartMatch }) {
                   />
                 ))}
 
-                {/* Sector Labels */}
+                {/* Sector Labels (radially aligned) */}
                 {countries.map((c, i) => (
                   <div
                     key={i}
@@ -944,65 +978,68 @@ export default function MatchSetup({ onStartMatch }) {
                     }}
                   >
                     <div style={{
-                      paddingTop: '22px',
+                      paddingTop: '20px',
                       color: '#ffffff',
-                      fontSize: '0.78rem',
+                      fontSize: '0.88rem',
                       fontWeight: 800,
-                      textShadow: '0 2px 4px rgba(0,0,0,0.85), 0 0 2px rgba(0,0,0,0.85)',
+                      textShadow: '0 2px 4px rgba(0,0,0,0.85)',
                       textAlign: 'center',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center'
                     }}>
-                      <div style={{ fontSize: '1.25rem', marginBottom: 2 }}>{c.emoji}</div>
-                      <div>{c.name}</div>
+                      <div style={{ fontSize: '1.4rem', marginBottom: 6 }}>{c.emoji}</div>
+                      <div style={{ letterSpacing: '0.5px' }}>{c.code}</div>
                     </div>
                   </div>
                 ))}
-
-                {/* Casino glowing lights on outer rim */}
-                {Array.from({ length: 12 }).map((_, idx) => (
-                  <div
-                    key={`bulb-${idx}`}
-                    style={{
-                      position: 'absolute',
-                      top: '4px', left: '139px',
-                      width: '12px', height: '12px',
-                      borderRadius: '50%',
-                      background: '#ffffff',
-                      boxShadow: '0 0 8px #ffffff, 0 0 15px #ffe066',
-                      transform: `rotate(${idx * 30}deg)`,
-                      transformOrigin: '6px 141px',
-                      zIndex: 4,
-                    }}
-                  />
-                ))}
-
-                {/* Inner Center Circle Peg */}
-                <div style={{
-                  position: 'absolute',
-                  top: '115px', left: '115px',
-                  width: '60px', height: '60px',
-                  borderRadius: '50%',
-                  background: 'radial-gradient(circle, #ffe066 0%, #ca8a04 100%)',
-                  border: '4px solid #ffffff',
-                  boxShadow: '0 4px 10px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.6)',
-                  zIndex: 5,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: '1.1rem',
-                }}>
-                  🏏
-                </div>
               </div>
+
+              {/* Inner Center Double Gear Peg */}
+              <div style={{
+                position: 'absolute',
+                top: '120px', left: '120px',
+                width: '80px', height: '80px',
+                borderRadius: '50%',
+                background: '#334155',
+                border: '4px solid #94a3b8',
+                boxShadow: '0 4px 8px rgba(0,0,0,0.6), inset 0 2px 4px rgba(255,255,255,0.2)',
+                zIndex: 8,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}>
+                <svg width="60" height="60" viewBox="0 0 100 100" style={{ transform: 'rotate(0deg)' }}>
+                  {/* Outer Gear Ring */}
+                  <circle cx="50" cy="50" r="30" fill="#1e293b" stroke="#cbd5e1" strokeWidth="6" />
+                  {/* Center Hole */}
+                  <circle cx="50" cy="50" r="12" fill="#0f172a" stroke="#cbd5e1" strokeWidth="4" />
+                  {/* Teeth */}
+                  {[0, 45, 90, 135, 180, 225, 270, 315].map(angle => (
+                    <rect
+                      key={angle}
+                      x="44" y="10"
+                      width="12" height="18"
+                      rx="2"
+                      fill="#cbd5e1"
+                      transform={`rotate(${angle} 50 50)`}
+                    />
+                  ))}
+                  {/* Inner ring */}
+                  <circle cx="50" cy="50" r="22" fill="none" stroke="#64748b" strokeWidth="2" />
+                </svg>
+              </div>
+
             </div>
 
             {/* Result announcement */}
             <div style={{ marginTop: 12, height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {spunResultObject ? (
-                <div className="animate-scale-in" style={{ fontSize: '1.3rem', fontWeight: 800, color: 'var(--accent-green)' }}>
-                  🎉 {spunResultObject.emoji} {spunResultObject.name}!
+                <div className="animate-scale-in" style={{ fontSize: '1.35rem', fontWeight: 800, color: '#4ade80' }}>
+                  🎉 {spunResultObject.emoji} {spunResultObject.name === 'Joker' ? 'JOKER! (Pick ANY player!)' : spunResultObject.name}!
                 </div>
               ) : (
-                <span style={{ fontSize: '0.85rem', color: 'var(--text-tertiary)', fontWeight: 600 }}>
+                <span style={{ fontSize: '0.85rem', color: '#94a3b8', fontWeight: 600 }}>
                   🌀 Wheel Spinning...
                 </span>
               )}
