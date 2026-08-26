@@ -30,7 +30,7 @@ const DRAFT_SLOTS = [
 const countries = [
   { name: 'India', emoji: '🇮🇳', color: '#1E90FF' },
   { name: 'Australia', emoji: '🇦🇺', color: '#FFD700' },
-  { name: 'England', emoji: '🏴&apos; England', color: '#003366', fullName: 'England' }, // Custom name mapping
+  { name: 'England', emoji: '🏴󠁧󠁢󠁥󠁮󠁧󠁿', color: '#003366' },
   { name: 'South Africa', emoji: '🇿🇦', color: '#007A4D' },
   { name: 'Pakistan', emoji: '🇵🇰', color: '#006600' },
   { name: 'New Zealand', emoji: '🇳🇿', color: '#111111' },
@@ -586,17 +586,18 @@ export default function MatchSetup({ onStartMatch }) {
             </p>
 
             {/* Spinner Board Container */}
-            <div style={{ position: 'relative', margin: '20px 0', width: '310px', height: '310px', display: 'flex', justifyContent: 'center' }}>
+            <div style={{ position: 'relative', margin: '20px 0', width: '320px', height: '320px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
               {/* Top Pointer */}
               <div style={{
                 position: 'absolute',
-                top: '-15px',
+                top: '-5px',
+                left: 'calc(50% - 15px)',
                 width: 0, height: 0,
                 borderLeft: '15px solid transparent',
                 borderRight: '15px solid transparent',
                 borderTop: '25px solid var(--accent-red)',
                 zIndex: 10,
-                filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.5))'
+                filter: 'drop-shadow(0 4px 6px rgba(0,0,0,0.5))'
               }} />
 
               {/* The Wheel */}
@@ -604,14 +605,30 @@ export default function MatchSetup({ onStartMatch }) {
                 width: '300px',
                 height: '300px',
                 borderRadius: '50%',
-                border: '6px solid var(--border-medium)',
-                boxShadow: '0 0 20px rgba(99, 102, 241, 0.25), inset 0 0 10px rgba(0,0,0,0.5)',
+                border: '8px solid var(--border-medium)',
+                boxShadow: '0 0 25px rgba(99, 102, 241, 0.35), inset 0 0 15px rgba(0,0,0,0.6)',
                 background: 'conic-gradient(#1E90FF 0deg 60deg, #FFD700 60deg 120deg, #003366 120deg 180deg, #007A4D 180deg 240deg, #006600 240deg 300deg, #111111 300deg 360deg)',
                 position: 'relative',
                 overflow: 'hidden',
                 transition: isSpinning ? 'transform 2.5s cubic-bezier(0.2, 0.8, 0.2, 1)' : 'none',
                 transform: `rotate(${wheelRotation}deg)`,
               }}>
+                {/* Sector Dividers */}
+                {countries.map((_, i) => (
+                  <div
+                    key={`line-${i}`}
+                    style={{
+                      position: 'absolute',
+                      top: 0, left: '149px',
+                      width: '2px', height: '150px',
+                      background: 'rgba(255, 255, 255, 0.25)',
+                      transform: `rotate(${i * 60}deg)`,
+                      transformOrigin: '1px 150px',
+                      zIndex: 2,
+                    }}
+                  />
+                ))}
+
                 {/* Sector Labels */}
                 {countries.map((c, i) => (
                   <div
@@ -620,15 +637,14 @@ export default function MatchSetup({ onStartMatch }) {
                       position: 'absolute',
                       top: 0, left: 0,
                       width: '100%', height: '100%',
-                      transform: `rotate(${i * 60}deg)`,
+                      transform: `rotate(${i * 60 + 30}deg)`,
                       transformOrigin: '50% 50%',
                       display: 'flex',
                       justifyContent: 'center',
+                      zIndex: 3
                     }}
                   >
                     <div style={{
-                      transform: 'rotate(30deg)',
-                      transformOrigin: '50% 0px',
                       paddingTop: '24px',
                       color: '#ffffff',
                       fontSize: '0.78rem',
@@ -636,23 +652,49 @@ export default function MatchSetup({ onStartMatch }) {
                       textShadow: '0 2px 4px rgba(0,0,0,0.85), 0 0 2px rgba(0,0,0,0.85)',
                       textAlign: 'center',
                     }}>
-                      <div style={{ fontSize: '1.2rem', marginBottom: 2 }}>{c.emoji}</div>
+                      <div style={{ fontSize: '1.25rem', marginBottom: 2 }}>{c.emoji}</div>
                       <div>{c.name}</div>
                     </div>
                   </div>
                 ))}
 
-                {/* Inner Center Circle peg */}
+                {/* Casino glowing lights on outer rim */}
+                {Array.from({ length: 12 }).map((_, idx) => (
+                  <div
+                    key={`bulb-${idx}`}
+                    style={{
+                      position: 'absolute',
+                      top: '4px', left: '144px',
+                      width: '12px', height: '12px',
+                      borderRadius: '50%',
+                      background: '#ffffff',
+                      boxShadow: '0 0 8px #ffffff, 0 0 15px #ffe066',
+                      transform: `rotate(${idx * 30}deg)`,
+                      transformOrigin: '6px 146px',
+                      zIndex: 4,
+                    }}
+                  />
+                ))}
+
+                {/* Inner Center Circle Peg */}
                 <div style={{
                   position: 'absolute',
-                  top: '125px', left: '125px',
-                  width: '50px', height: '50px',
+                  top: '120px', left: '120px',
+                  width: '60px', height: '60px',
                   borderRadius: '50%',
-                  background: 'var(--bg-primary)',
-                  border: '4px solid var(--border-medium)',
-                  boxShadow: '0 2px 4px rgba(0,0,0,0.5)',
-                  zIndex: 5
-                }} />
+                  background: 'radial-gradient(circle, #ffe066 0%, #ca8a04 100%)',
+                  border: '4px solid #ffffff',
+                  boxShadow: '0 4px 10px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.6)',
+                  zIndex: 5,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  color: '#ffffff',
+                  fontSize: '1.1rem',
+                  fontWeight: 'bold',
+                }}>
+                  🏏
+                </div>
               </div>
             </div>
 
@@ -660,7 +702,7 @@ export default function MatchSetup({ onStartMatch }) {
             <div style={{ marginTop: 12, height: '60px', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
               {selectedCountryResult ? (
                 <div className="animate-scale-in" style={{ fontSize: '1.25rem', fontWeight: 700, color: 'var(--accent-green)' }}>
-                  🎉 {selectedCountryResult.emoji} {selectedCountryResult.fullName || selectedCountryResult.name}!
+                  🎉 {selectedCountryResult.emoji} {selectedCountryResult.name}!
                 </div>
               ) : (
                 <button
