@@ -203,14 +203,20 @@ export default function MatchSetup({ onStartMatch }) {
   // Turn-based Spin Wheel trigger (opens Pop-Out Modal)
   const triggerSpin = () => {
     if (isSpinning) return;
-    setIsSpinning(true);
+    setIsSpinning(false); // Snap to no-transition
     setIsWheelModalOpen(true);
     setSpunResultObject(null);
     setTurnSpunCountry(null);
+    setWheelRotation(0); // Snap back to 0deg instantly
 
     const targetIdx = Math.floor(Math.random() * 6);
     const rotation = 1800 + (360 - (targetIdx * 60 + 30));
-    setWheelRotation(rotation);
+
+    // Delay target rotation to let the Modal mount at 0deg first
+    setTimeout(() => {
+      setIsSpinning(true);
+      setWheelRotation(rotation);
+    }, 50);
 
     setTimeout(() => {
       const countryObj = countries[targetIdx];
@@ -223,7 +229,7 @@ export default function MatchSetup({ onStartMatch }) {
       setTimeout(() => {
         setIsWheelModalOpen(false);
       }, 1000);
-    }, 2500);
+    }, 2550); // Match delay offset
   };
 
   // Selects player and advances the draft turn
